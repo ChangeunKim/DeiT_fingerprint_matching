@@ -1,3 +1,10 @@
+models/
+packages/
+
+# Output
+*.onnx
+*.pt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -26,7 +33,6 @@ share/python-wheels/
 *.egg
 MANIFEST
 .vs/
-*.onnx
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
