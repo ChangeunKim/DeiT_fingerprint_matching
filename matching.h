@@ -3,7 +3,7 @@
 
 #include <math.h>
 
-float cosine_similarity(const float* vector1, const float* vector2);
+float cosine_similarity(const float* vector1, const float* vector2, int vector_length);
 float template_distance(const float* template1, const float* template2);
 
 // API function
