@@ -1,5 +1,6 @@
 models/
 packages/
+x64/
 
 # Output
 *.onnx
