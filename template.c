@@ -1,60 +1,80 @@
 #include "template.h"
 
-int read_bmp_image(const char* filename, unsigned char** img, int* width, int* height, uint16_t* bpp) {
+int read_bmp_image(const char* filename, unsigned char** img, int* width, int* height) {
+    // Open the BMP file
     FILE* file = fopen(filename, "rb");
-    if (!file) {
-        perror("Error opening BMP file");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening BMP file\n");
         return -1;
     }
 
-    // Read BMP file header
-    uint16_t bfType;
-    fread(&bfType, sizeof(uint16_t), 1, file);
-    if (bfType != 0x4D42) {  // 'BM' in hexadecimal
+    // Read the BMP header (first 18 bytes)
+    unsigned char header[54];
+    fread(header, 1, 54, file);
+
+    // Check for BMP signature 'BM'
+    if (header[0] != 'B' || header[1] != 'M') {
+        fprintf(stderr, "Error: Not a BMP file\n");
         fclose(file);
-        fprintf(stderr, "Not a valid BMP file.\n");
         return -1;
     }
 
-    fseek(file, 18, SEEK_SET);  // Move to the width/height section
-    fread(width, sizeof(int), 1, file);   // Image width
-    fread(height, sizeof(int), 1, file);  // Image height
+    // Extract width, height, and bit depth (bits per pixel)
+    *width = *(int*)&header[18];   // 4 bytes: width of the image
+    *height = *(int*)&header[22];  // 4 bytes: height of the image
+    short bpp = *(short*)&header[28];  // 2 bytes: bits per pixel (BPP)
 
-    // Save the original height sign
-    int original_height = *height;
-
-    // Take the absolute value of height for memory allocation and other computations
+    // Take the absolute value of height if it's negative (top-down or bottom-up)
     *height = abs(*height);
 
-    // Read bits per pixel (bpp) from the BMP header (at offset 28)
-    fseek(file, 28, SEEK_SET);  // Move to the bits per pixel section
-    fread(bpp, sizeof(uint16_t), 1, file);
-
-    int row_padded = (*width * 3 + 3) & (~3); // Each row is padded to a multiple of 4 bytes
-    *img = (unsigned char*)malloc(row_padded * (*height));
-    if (*img == NULL) {
+    // Check for valid bit depths (support 24-bit and 8-bit grayscale)
+    if (bpp != 24 && bpp != 8) {
+        fprintf(stderr, "Error: Unsupported BMP format (only 24-bit or 8-bit grayscale supported)\n");
         fclose(file);
-        fprintf(stderr, "Memory allocation failed.\n");
         return -1;
     }
 
-    fseek(file, 54, SEEK_SET); // Move to the pixel data
-    fread(*img, 1, row_padded * (*height), file);
+    // Calculate the total size of the image data
+    int row_size = ((*width * bpp + 31) / 32) * 4; // Row size including padding
+    int img_data_size = row_size * (*height);
 
-    // Reverse the rows if the original height was negative (top-down DIB)
-    if (original_height < 0) {
-        int half = *height / 2;
-        for (int i = 0; i < half; i++) {
-            // Swap rows i and height - i - 1
-            for (int j = 0; j < row_padded; j++) {
-                unsigned char temp = (*img)[i * row_padded + j];
-                (*img)[i * row_padded + j] = (*img)[(*height - i - 1) * row_padded + j];
-                (*img)[(*height - i - 1) * row_padded + j] = temp;
-            }
-        }
+    // Allocate memory for the image data
+    *img = (unsigned char*)malloc(img_data_size);
+    if (*img == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed\n");
+        fclose(file);
+        return -1;
     }
 
+    // Read the pixel data
+    fseek(file, *(int*)&header[10], SEEK_SET);  // Go to the pixel data offset
+    fread(*img, 1, img_data_size, file);
     fclose(file);
+
+    // If the image is grayscale (8-bit), convert it to RGB
+    if (bpp == 8) {
+        unsigned char* temp_img = (unsigned char*)malloc(*width * *height * 3);  // RGB buffer
+        if (temp_img == NULL) {
+            fprintf(stderr, "Error: Memory allocation failed for grayscale to RGB conversion\n");
+            free(*img);
+            return -1;
+        }
+
+        // Convert grayscale to RGB
+        for (int i = 0, j = 0; i < *height; i++) {
+            for (int k = 0; k < *width; k++) {
+                unsigned char gray = (*img)[i * row_size + k];
+                temp_img[j++] = gray;  // Red
+                temp_img[j++] = gray;  // Green
+                temp_img[j++] = gray;  // Blue
+            }
+        }
+
+        // Free the old image data and point to the new RGB data
+        free(*img);
+        *img = temp_img;
+    }
+
     return 0;
 }
 
@@ -94,10 +114,9 @@ int generate_template(const char* image_filename, const char* model_filename, fl
 
     unsigned char* img = NULL;
     int width, height;
-    uint16_t bpp;
 
     // Read the image file
-    if (read_bmp_image(image_filename, &img, &width, &height, &bpp) != 0) {
+    if (read_bmp_image(image_filename, &img, &width, &height) != 0) {
         return -1;  // Error reading image
     }
 

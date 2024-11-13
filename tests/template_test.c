@@ -10,10 +10,9 @@ void test_bmp_reader() {
 
     unsigned char* img_data = NULL;
     int width, height;
-    uint16_t bpp;
 
     // Call the BMP reader function to read the image
-    if (read_bmp_image(bmp_filename, &img_data, &width, &height, &bpp) != 0) {
+    if (read_bmp_image(bmp_filename, &img_data, &width, &height) != 0) {
         fprintf(stderr, "Error: Failed to read BMP file\n");
         exit(1);
     }
@@ -42,21 +41,8 @@ void test_bmp_reader() {
     fread(reference_data, 1, reference_size, reference_file);
     fclose(reference_file);
 
-    // Print the first few bytes of both the reference and BMP file
-    printf("First 16 bytes of BMP file data:\n");
-    for (int i = 0; i < 16 && i < reference_size; i++) {
-        printf("%02x ", img_data[i]);
-    }
-    printf("\n");
-
-    printf("First 16 bytes of reference file data:\n");
-    for (int i = 0; i < 16 && i < reference_size; i++) {
-        printf("%02x ", reference_data[i]);
-    }
-    printf("\n");
-
     // Verify that the size matches the expected BMP data size
-    long img_data_size = width * height * (bpp / 8);  // Considering bpp (bits per pixel)
+    long img_data_size = width * height * 3;  // Considering bpp (bits per pixel)
     if (img_data_size != reference_size) {
         fprintf(stderr, "Error: Image data size does not match reference\n");
         free(img_data);

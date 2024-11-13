@@ -3,6 +3,7 @@ import numpy as np
 
 # Load the BMP file with PIL
 bmp_image = Image.open("tests/samples/fingerprint_image.bmp")
+bmp_image = bmp_image.convert("RGB")
 print("Mode:", bmp_image.mode)  # RGB, RGBA, L (grayscale), etc.
 print("Size:", bmp_image.size)  # (width, height)
 print("First pixel:", bmp_image.getdata()[0])  # First pixel value

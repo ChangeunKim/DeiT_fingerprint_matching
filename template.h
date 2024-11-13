@@ -32,7 +32,7 @@ typedef struct {
 } BMPInfoHeader;
 
 // Image
-int read_bmp_image(const char* filename, unsigned char** img, int* width, int* height, uint16_t* bpp);
+int read_bmp_image(const char* filename, unsigned char** img, int* width, int* height);
 void resize_image(unsigned char* input_img, unsigned char* output_img, int width, int height);
 void normalize_image(unsigned char* input_img, unsigned char* output_img);
 void preprocess_image(unsigned char* input_img, unsigned char* output_img, int width, int height);
