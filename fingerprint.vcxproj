@@ -131,7 +131,9 @@
   <ItemGroup>
     <ClCompile Include="matching.c" />
     <ClCompile Include="template.c" />
+    <ClCompile Include="tests\matching_test.c" />
     <ClCompile Include="tests\template_test.c" />
+    <ClCompile Include="tests\test.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

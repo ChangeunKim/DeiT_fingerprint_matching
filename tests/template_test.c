@@ -1,7 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
 #include "../template.h"
 
 void test_bmp_reader() {
@@ -65,10 +61,4 @@ void test_bmp_reader() {
     // Free allocated memory
     free(img_data);
     free(reference_data);
-}
-
-
-int main() {
-    test_bmp_reader();
-    return 0;
 }

@@ -1,6 +1,8 @@
+# C specific log files
 models/
 packages/
 x64/
+fingerprint/
 
 # Output
 *.onnx

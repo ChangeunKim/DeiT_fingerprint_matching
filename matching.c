@@ -13,8 +13,8 @@ float cosine_similarity(const float* vector1, const float* vector2, int vector_l
 		magnitude1 += vector1[i] * vector1[i];
 		magnitude2 += vector2[i] * vector2[i];
 	}
-	magnitude1 = sqrt(magnitude1);
-	magnitude2 = sqrt(magnitude2);
+	magnitude1 = sqrtf(magnitude1);
+	magnitude2 = sqrtf(magnitude2);
 
 	// Avoid division by zero
 	if (magnitude1 == 0 || magnitude2 == 0) {
@@ -47,18 +47,3 @@ int fingerprint_identification(float* query_template, float** template_db, int d
 float fingerprint_verification(const float* query_template, const float* verify_template) {
 	return template_distance(query_template, verify_template);
 }
-
-
-// test purpose main
-/*
-int main() {
-	float vector1[] = { 1.0, 1.0 };
-	float vector2[] = { 0, 5.0 };
-	int vector_length = 2;
-
-	float similarity = cosine_similarity(vector1, vector2, vector_length);
-	printf("Cosine Similarity: %.6f\n", similarity);
-
-	return 0;
-}
-*/
