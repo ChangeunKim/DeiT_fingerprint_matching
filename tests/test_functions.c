@@ -1,4 +1,4 @@
-#include "test_resize_image.h"
+#include "test_functions.h"
 
 void test_resize_image() {
     const char* bmp_filename = "tests/samples/fingerprint_image.bmp";
@@ -113,3 +113,53 @@ void test_normalize_image() {
     free(resized_img);
     free(normalized_img);
 }
+
+/*
+void test_load_model() {
+    const char* model_path = "C:/Users/owner/source/repos/DeiT_fingerprint_matching/tests/optimized_deit_tiny_siamese.onnx";
+    OrtEnv* env = NULL;
+    OrtSession* session = NULL;
+
+    printf("Testing model loading: %s\n", model_path);
+
+    // Attempt to load the model
+    int result = load_model(model_path, &env, &session);
+    if (result != 0 || session == NULL) {
+        fprintf(stderr, "\nIn test_load_model() - Test failed: Unable to load model '%s'.\n\n", model_path);
+        return;
+    }
+
+    printf("Test passed: Model '%s' loaded successfully.\n", model_path);
+
+    // Verify the session by checking the input and output node counts
+    const OrtApi* api = OrtGetApiBase()->GetApi(ORT_API_VERSION);
+    OrtStatus* status = NULL;
+
+    // Get the number of input nodes
+    size_t num_input_nodes;
+    status = api->SessionGetInputCount(session, &num_input_nodes);
+    if (status != NULL) {
+        fprintf(stderr, "Error getting input count: %s\n", api->GetErrorMessage(status));
+        api->ReleaseStatus(status);
+    }
+    else {
+        printf("Number of inputs: %zu\n", num_input_nodes);
+    }
+
+    // Get the number of output nodes
+    size_t num_output_nodes;
+    status = api->SessionGetOutputCount(session, &num_output_nodes);
+    if (status != NULL) {
+        fprintf(stderr, "Error getting output count: %s\n", api->GetErrorMessage(status));
+        api->ReleaseStatus(status);
+    }
+    else {
+        printf("Number of outputs: %zu\n", num_output_nodes);
+    }
+
+    // Clean up
+    api->ReleaseSession(session);
+    api->ReleaseEnv(env);
+    printf("Test completed successfully.\n");
+}
+*/

@@ -129,10 +129,54 @@ void preprocess_image(unsigned char* input_img, unsigned char* output_img, int i
     free(resized_img);
 }
 
-int load_model(const char* filename, OrtSession** out_session) {
+// Function to load an ONNX model and create an ONNX Runtime session
+int load_model(const OrtApi* g_ort, const char* filename, OrtSession** out_session, OrtEnv** out_env) {
+    if (g_ort == NULL || filename == NULL || out_session == NULL || out_env == NULL) {
+        fprintf(stderr, "Invalid input parameters.\n");
+        return -1;
+    }
 
-    // 1. load onnx file
-    // 2. create onnx runtime session
+    OrtEnv* env = NULL;
+    OrtSessionOptions* session_options = NULL;
+    OrtStatus* status = NULL;
+
+    // Initialize ONNX Runtime environment
+    status = g_ort->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "ONNXRuntime", &env);
+    if (status != NULL) {
+        fprintf(stderr, "Failed to create ONNX Runtime environment: %s\n", g_ort->GetErrorMessage(status));
+        g_ort->ReleaseStatus(status);
+        return -1;
+    }
+
+    // Create session options
+    status = g_ort->CreateSessionOptions(&session_options);
+    if (status != NULL) {
+        fprintf(stderr, "Failed to create session options: %s\n", g_ort->GetErrorMessage(status));
+        g_ort->ReleaseEnv(env);
+        g_ort->ReleaseStatus(status);
+        return -1;
+    }
+
+    // Set optimization level to enable all optimizations
+    g_ort->SetSessionGraphOptimizationLevel(session_options, ORT_ENABLE_ALL);
+
+    // Load ONNX model and create session
+    status = g_ort->CreateSession(env, filename, session_options, out_session);
+    if (status != NULL) {
+        fprintf(stderr, "Failed to load ONNX model '%s': %s\n", filename, g_ort->GetErrorMessage(status));
+        g_ort->ReleaseSessionOptions(session_options);
+        g_ort->ReleaseEnv(env);
+        g_ort->ReleaseStatus(status);
+        return -1;
+    }
+
+    printf("ONNX model '%s' loaded successfully.\n", filename);
+
+    // Clean up session options
+    g_ort->ReleaseSessionOptions(session_options);
+
+    // Return the environment to be used outside
+    *out_env = env;
 
     return 0;
 }
@@ -163,6 +207,7 @@ int generate_template(const char* image_filename, const char* model_filename, fl
 
     // load_model();
     // run_model();
-
+    
     return 0;
+
 }
