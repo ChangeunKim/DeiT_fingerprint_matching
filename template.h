@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <assert.h>
 #include <onnxruntime_c_api.h>
 
 // BMP file header
@@ -38,7 +39,7 @@ void normalize_image(unsigned char* input_img, float* output_img, int output_wid
 void preprocess_image(unsigned char* input_img, unsigned char* output_img, int input_width, int input_height, int output_width, int output_height);
 
 // ONNX Model
-int load_model(const char* filename, OrtSession** out_session);
+int load_model(const OrtApi* g_ort, const char* filename, OrtSession** out_session, OrtEnv** out_env);
 int run_model(OrtSession* session, float* input_template);
 
 // API function
