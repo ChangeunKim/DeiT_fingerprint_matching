@@ -33,9 +33,9 @@ typedef struct {
 
 // Image
 int read_bmp_image(const char* filename, unsigned char** img, int* width, int* height);
-void resize_image(unsigned char* input_img, unsigned char* output_img, int width, int height);
-void normalize_image(unsigned char* input_img, unsigned char* output_img);
-void preprocess_image(unsigned char* input_img, unsigned char* output_img, int width, int height);
+void resize_image(unsigned char* input_img, unsigned char* output_img, int input_width, int input_height, int output_width, int output_height);
+void normalize_image(unsigned char* input_img, float* output_img, int output_width, int output_height);
+void preprocess_image(unsigned char* input_img, unsigned char* output_img, int input_width, int input_height, int output_width, int output_height);
 
 // ONNX Model
 int load_model(const char* filename, OrtSession** out_session);
