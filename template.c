@@ -78,18 +78,54 @@ int read_bmp_image(const char* filename, unsigned char** img, int* width, int* h
     return 0;
 }
 
-void resize_image(unsigned char* input_img, unsigned char* output_img, int width, int height) {
-    
+// Function to resize an image using bilinear interpolation
+void resize_image(unsigned char* input_img, unsigned char* output_img,
+    int input_width, int input_height,
+    int output_width, int output_height) {
+
+    float x_ratio = (float)(input_width - 1) / (output_width - 1);
+    float y_ratio = (float)(input_height - 1) / (output_height - 1);
+
+    for (int y = 0; y < output_height; y++) {
+        for (int x = 0; x < output_width; x++) {
+            float gx = x * x_ratio;
+            float gy = y * y_ratio;
+
+            int x0 = (int)gx;
+            int y0 = (int)gy;
+            int x1 = (x0 + 1 < input_width) ? x0 + 1 : x0;
+            int y1 = (y0 + 1 < input_height) ? y0 + 1 : y0;
+
+            float wx = gx - x0;
+            float wy = gy - y0;
+
+            // Pixel values at the four corners
+            unsigned char TL = input_img[y0 * input_width + x0];
+            unsigned char TR = input_img[y0 * input_width + x1];
+            unsigned char BL = input_img[y1 * input_width + x0];
+            unsigned char BR = input_img[y1 * input_width + x1];
+
+            // Bilinear interpolation
+            float top = (1 - wx) * TL + wx * TR;
+            float bottom = (1 - wx) * BL + wx * BR;
+            float value = (1 - wy) * top + wy * bottom;
+
+            output_img[y * output_width + x] = (unsigned char)(value + 0.5f);  // Round to nearest
+        }
+    }
 }
 
-void normalize_image(unsigned char* input_img, unsigned char* output_img) {
-    
+void normalize_image(unsigned char* input_img, float* output_img, int output_width, int output_height) {
+    for (int i = 0; i < output_width * output_height; i++) {
+        output_img[i] = input_img[i] / 255.0f;  // Normalize to [0, 1]
+    }
 }
 
-void preprocess_image(unsigned char* input_img, unsigned char* output_img, int width, int height) {
-    unsigned char* resized_img = (unsigned char*)malloc(width * height * sizeof(unsigned char));
-    resize_image(input_img, resized_img, width, height);
-    normalize_image(resized_img, output_img);
+
+void preprocess_image(unsigned char* input_img, unsigned char* output_img, int input_width, int input_height, int output_width, int output_height) {
+    unsigned char* resized_img = (unsigned char*)malloc(output_width * output_height * sizeof(unsigned char));
+    resize_image(input_img, resized_img,input_width, input_height, output_width, output_height);
+    normalize_image(resized_img, output_img, output_width, output_height);
     free(resized_img);
 }
 
@@ -122,7 +158,7 @@ int generate_template(const char* image_filename, const char* model_filename, fl
 
     // Preprocess image
     unsigned char output_img[224 * 224];  // Preprocessed image (224x224)
-    preprocess_image(img, output_img, 224, 224);
+    preprocess_image(img, output_img, width, height, 224, 224);
     free(img);
 
     // load_model();
