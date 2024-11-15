@@ -127,6 +127,8 @@
   <ItemGroup>
     <ClInclude Include="matching.h" />
     <ClInclude Include="template.h" />
+    <ClInclude Include="tests\template_test.h" />
+    <ClInclude Include="tests\test_functions.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="matching.c" />
@@ -134,9 +136,11 @@
     <ClCompile Include="tests\matching_test.c" />
     <ClCompile Include="tests\template_test.c" />
     <ClCompile Include="tests\test.c" />
+    <ClCompile Include="tests\test_functions.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="tests\optimized_deit_tiny_siamese.onnx" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

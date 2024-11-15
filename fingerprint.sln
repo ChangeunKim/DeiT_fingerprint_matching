@@ -5,6 +5,11 @@ VisualStudioVersion = 17.11.35327.3
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fingerprint", "fingerprint.vcxproj", "{EBD6C7F0-C9B9-44E9-993F-BD8A17EAEE7C}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "솔루션 항목", "솔루션 항목", "{AA050EF4-2F95-48F9-BB69-D245B1A274E7}"
+	ProjectSection(SolutionItems) = preProject
+		tests\optimized_deit_tiny_siamese.onnx = tests\optimized_deit_tiny_siamese.onnx
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64

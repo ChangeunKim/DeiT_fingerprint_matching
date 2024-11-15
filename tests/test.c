@@ -6,6 +6,21 @@
 #include "../template.h"
 
 
+
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
+// UTF-8 문자열을 wchar_t로 변환하는 함수 (Windows 전용)
+#ifdef _WIN32
+wchar_t* convert_to_wchar(const char* utf8_str) {
+    int len = MultiByteToWideChar(CP_UTF8, 0, utf8_str, -1, NULL, 0);
+    wchar_t* wstr = (wchar_t*)malloc(len * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, utf8_str, -1, wstr, len);
+    return wstr;
+}
+#endif
+
 void test_bmp_reader();
 void test_cosine_similarity();
 void check_file_access(const char* filepath) {
@@ -43,29 +58,53 @@ int main() {
 
 
     printf("Running test: Load Model\n");
-    const char* model_path = "tests/optimized_deit_tiny_siamese.onnx";// "C: / Users / owner / source / repos / DeiT_fingerprint_matching / tests / optimized_deit_tiny_siamese.onnx";
-    OrtSession* session = NULL;
-    OrtEnv* env = NULL;
+    const char* model_path = "C:/Users/owner/source/repos/DeiT_fingerprint_matching/tests/optimized_deit_tiny_siamese.onnx";
+    check_file_access(model_path);
 
-    // Initialize ONNX Runtime
+    #ifdef _WIN32
+    wchar_t* w_model_path = convert_to_wchar(model_path);
+    if (!w_model_path) {
+        fprintf(stderr, "Failed to convert model path to wide char.\n");
+        return -1;
+    }
+    #else
+    const char* w_model_path = model_path;  // Unix에서는 UTF-8 사용 가능
+    #endif
+
+    
     const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
-    if (!g_ort) {
-        fprintf(stderr, "Failed to initialize ONNX Runtime.\n");
+    if (g_ort == NULL) {
+        fprintf(stderr, "Failed to initialize ONNX Runtime API.\n");
         return -1;
     }
 
-    // Load the model
-    if (load_model(g_ort, model_path, &session, &env) != 0) {
+    test_load_model(g_ort, w_model_path);
+    printf("Completed test: Load Model\n\n");
+    
+
+    printf("Running test: Run Model\n");
+
+    OrtEnv* env = NULL;
+    OrtSession* session = NULL;
+
+    // 모델 로드 및 세션 생성
+    if (load_model(g_ort, w_model_path, &env, &session) != 0) {
+        fprintf(stderr, "Failed to load model.\n");
         return -1;
     }
 
-    // Prepare dummy input data
-    float input_template[1 * 3 * 224 * 224] = { 0.0f };
+    // 모델 실행 테스트
+    test_run_model(g_ort, session);
 
-
-    // Clean up
+    // 리소스 해제
     g_ort->ReleaseSession(session);
     g_ort->ReleaseEnv(env);
+    printf("Completed test: Run Model\n\n");
+
+
+#ifdef _WIN32
+    free(w_model_path);
+#endif
 
     return 0;
 }

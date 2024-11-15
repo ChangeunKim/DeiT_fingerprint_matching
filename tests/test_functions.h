@@ -10,6 +10,7 @@
 // resize image
 void test_resize_image();
 void test_normalize_image();
-//void test_load_model();
+void test_load_model(const OrtApi* g_ort, const ORTCHAR_T* model_path);
+void test_run_model(const OrtApi* g_ort, OrtSession* session);
 
 #endif // TEST_RESIZE_IMAGE_H

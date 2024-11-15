@@ -1,5 +1,16 @@
 #include "test_functions.h"
 
+#define ORT_ABORT_ON_ERROR(expr, g_ort)                      \
+  do {                                                       \
+    OrtStatus* onnx_status = (expr);                         \
+    if (onnx_status != NULL) {                               \
+      const char* msg = g_ort->GetErrorMessage(onnx_status); \
+      fprintf(stderr, "Error: %s\n", msg);                   \
+      g_ort->ReleaseStatus(onnx_status);                     \
+      abort();                                               \
+    }                                                        \
+  } while (0)
+
 void test_resize_image() {
     const char* bmp_filename = "tests/samples/fingerprint_image.bmp";
     unsigned char* img = NULL;
@@ -114,52 +125,67 @@ void test_normalize_image() {
     free(normalized_img);
 }
 
-/*
-void test_load_model() {
-    const char* model_path = "C:/Users/owner/source/repos/DeiT_fingerprint_matching/tests/optimized_deit_tiny_siamese.onnx";
-    OrtEnv* env = NULL;
-    OrtSession* session = NULL;
 
-    printf("Testing model loading: %s\n", model_path);
-
-    // Attempt to load the model
-    int result = load_model(model_path, &env, &session);
-    if (result != 0 || session == NULL) {
-        fprintf(stderr, "\nIn test_load_model() - Test failed: Unable to load model '%s'.\n\n", model_path);
+void test_load_model(const OrtApi* g_ort, const ORTCHAR_T* model_path) {
+    if (g_ort == NULL || model_path == NULL) {
+        fprintf(stderr, "Test failed: Invalid parameters.\n");
         return;
     }
 
-    printf("Test passed: Model '%s' loaded successfully.\n", model_path);
+    OrtEnv* env = NULL;
+    OrtSession* session = NULL;
 
-    // Verify the session by checking the input and output node counts
-    const OrtApi* api = OrtGetApiBase()->GetApi(ORT_API_VERSION);
-    OrtStatus* status = NULL;
-
-    // Get the number of input nodes
-    size_t num_input_nodes;
-    status = api->SessionGetInputCount(session, &num_input_nodes);
-    if (status != NULL) {
-        fprintf(stderr, "Error getting input count: %s\n", api->GetErrorMessage(status));
-        api->ReleaseStatus(status);
-    }
-    else {
-        printf("Number of inputs: %zu\n", num_input_nodes);
+    // load_model 호출
+    int result = load_model(g_ort, model_path, &env, &session);
+    if (result != 0) {
+        fprintf(stderr, "Test failed: Unable to load model '%s'.\n", model_path);
+        return;
     }
 
-    // Get the number of output nodes
-    size_t num_output_nodes;
-    status = api->SessionGetOutputCount(session, &num_output_nodes);
-    if (status != NULL) {
-        fprintf(stderr, "Error getting output count: %s\n", api->GetErrorMessage(status));
-        api->ReleaseStatus(status);
-    }
-    else {
-        printf("Number of outputs: %zu\n", num_output_nodes);
-    }
+    // 입력 및 출력 노드 수 확인
+    size_t num_input_nodes, num_output_nodes;
+    ORT_ABORT_ON_ERROR(g_ort->SessionGetInputCount(session, &num_input_nodes), g_ort);
+    ORT_ABORT_ON_ERROR(g_ort->SessionGetOutputCount(session, &num_output_nodes), g_ort);
 
-    // Clean up
-    api->ReleaseSession(session);
-    api->ReleaseEnv(env);
-    printf("Test completed successfully.\n");
+    printf("Model loaded successfully.\n");
+    printf("Number of inputs: %zu\n", num_input_nodes);
+    printf("Number of outputs: %zu\n", num_output_nodes);
+
+    // 리소스 해제
+    g_ort->ReleaseSession(session);
+    g_ort->ReleaseEnv(env);
 }
-*/
+
+void test_run_model(const OrtApi* g_ort, OrtSession* session) {
+    if (g_ort == NULL || session == NULL) {
+        fprintf(stderr, "Test failed: Invalid parameters.\n");
+        return;
+    }
+
+    // 테스트 입력 데이터 1
+    float input_data1[4] = { 1.0f, 2.0f, 3.0f, 4.0f };
+    size_t input_size1 = 4;
+
+    // 테스트 입력 데이터 2
+    float input_data2[4] = { 5.0f, 6.0f, 7.0f, 8.0f };
+    size_t input_size2 = 4;
+
+    // 출력 데이터 버퍼
+    float output_data[4] = { 0 };
+    size_t output_size = 4;
+
+    // 모델 실행 테스트
+    int result = run_model(g_ort, session, input_data1, input_size1, input_data2, input_size2, output_data, output_size);
+    if (result != 0) {
+        fprintf(stderr, "Test failed: Unable to run model.\n");
+        return;
+    }
+
+    // 출력 결과 확인
+    printf("Model output:\n");
+    for (size_t i = 0; i < output_size; i++) {
+        printf("Output[%zu] = %f\n", i, output_data[i]);
+    }
+
+    printf("Test passed: Model ran successfully.\n");
+}
