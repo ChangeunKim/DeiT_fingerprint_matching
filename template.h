@@ -41,7 +41,8 @@ void preprocess_image(unsigned char* input_img, unsigned char* output_img, int i
 // ONNX Model
 int load_model(const OrtApi* g_ort, const ORTCHAR_T* model_path, OrtEnv** out_env, OrtSession** out_session);
 int run_model(const OrtApi* g_ort, OrtSession* session, float* input_data1, size_t input_size1,
-    float* input_data2, size_t input_size2, float* output_data, size_t output_size);
+    float* input_data2, size_t input_size2, float* output_data1, size_t output_size1,
+    float* output_data2, size_t output_size2);
 
 // API function
 int generate_template(const char* image_filename, const char* model_filename, float* input_template);

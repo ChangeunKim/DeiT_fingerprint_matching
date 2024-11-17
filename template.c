@@ -172,9 +172,12 @@ int load_model(const OrtApi* g_ort, const ORTCHAR_T* model_path, OrtEnv** out_en
     return 0;  // 성공
 }
 
+
 int run_model(const OrtApi* g_ort, OrtSession* session, float* input_data1, size_t input_size1,
-    float* input_data2, size_t input_size2, float* output_data, size_t output_size) {
-    if (g_ort == NULL || session == NULL || input_data1 == NULL || input_data2 == NULL || output_data == NULL) {
+    float* input_data2, size_t input_size2, float* output_data1, size_t output_size1,
+    float* output_data2, size_t output_size2) {
+    if (g_ort == NULL || session == NULL || input_data1 == NULL || input_data2 == NULL ||
+        output_data1 == NULL || output_data2 == NULL) {
         fprintf(stderr, "Invalid input parameters.\n");
         return -1;
     }
@@ -183,41 +186,48 @@ int run_model(const OrtApi* g_ort, OrtSession* session, float* input_data1, size
     ORT_ABORT_ON_ERROR(g_ort->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memory_info), g_ort);
 
     // 첫 번째 입력 텐서 생성
-    int64_t input_shape1[] = { 1, input_size1 };
+    int64_t input_shape1[] = { 1, 3, 224, 224 };
     OrtValue* input_tensor1 = NULL;
     ORT_ABORT_ON_ERROR(g_ort->CreateTensorWithDataAsOrtValue(memory_info, input_data1, input_size1 * sizeof(float),
-        input_shape1, 2, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &input_tensor1), g_ort);
+        input_shape1, 4, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &input_tensor1), g_ort);
 
     // 두 번째 입력 텐서 생성
-    int64_t input_shape2[] = { 1, input_size2 };
+    int64_t input_shape2[] = { 1, 3, 224, 224 };
     OrtValue* input_tensor2 = NULL;
     ORT_ABORT_ON_ERROR(g_ort->CreateTensorWithDataAsOrtValue(memory_info, input_data2, input_size2 * sizeof(float),
-        input_shape2, 2, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &input_tensor2), g_ort);
+        input_shape2, 4, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &input_tensor2), g_ort);
 
     // 모델 실행
-    const char* input_names[] = { "input1", "input2" };  // 모델에서 확인된 입력 이름
-    const char* output_names[] = { "output" };  // 출력 이름 (모델의 출력 이름에 따라 수정 필요)
-    OrtValue* output_tensor = NULL;
+    const char* input_names[] = { "input1", "input2" };
+    const char* output_names[] = { "output1", "output2" };
+    OrtValue* output_tensors[2] = { NULL, NULL };
+
     ORT_ABORT_ON_ERROR(g_ort->Run(session, NULL, input_names,
         (const OrtValue* const []) {
         input_tensor1, input_tensor2
     }, 2,
-        output_names, 1, & output_tensor), g_ort);
+        output_names, 2, output_tensors), g_ort);
 
-    // 출력 데이터 가져오기
-    float* output_tensor_data = NULL;
-    ORT_ABORT_ON_ERROR(g_ort->GetTensorMutableData(output_tensor, (void**)&output_tensor_data), g_ort);
+    // 첫 번째 출력 데이터 가져오기
+    float* output_tensor_data1 = NULL;
+    ORT_ABORT_ON_ERROR(g_ort->GetTensorMutableData(output_tensors[0], (void**)&output_tensor_data1), g_ort);
+    for (size_t i = 0; i < output_size1; i++) {
+        output_data1[i] = output_tensor_data1[i];
+    }
 
-    // 출력 데이터를 복사
-    for (size_t i = 0; i < output_size; i++) {
-        output_data[i] = output_tensor_data[i];
+    // 두 번째 출력 데이터 가져오기
+    float* output_tensor_data2 = NULL;
+    ORT_ABORT_ON_ERROR(g_ort->GetTensorMutableData(output_tensors[1], (void**)&output_tensor_data2), g_ort);
+    for (size_t i = 0; i < output_size2; i++) {
+        output_data2[i] = output_tensor_data2[i];
     }
 
     // 리소스 해제
     g_ort->ReleaseMemoryInfo(memory_info);
     g_ort->ReleaseValue(input_tensor1);
     g_ort->ReleaseValue(input_tensor2);
-    g_ort->ReleaseValue(output_tensor);
+    g_ort->ReleaseValue(output_tensors[0]);
+    g_ort->ReleaseValue(output_tensors[1]);
 
     return 0;  // 성공
 }
