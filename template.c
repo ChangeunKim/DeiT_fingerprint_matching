@@ -78,53 +78,145 @@ int read_bmp_image(const char* filename, unsigned char** img, int* width, int* h
     return 0;
 }
 
-// Helper function to interpolate pixel values (bilinear interpolation)
-unsigned char interpolate(unsigned char* image, int w, int h, float x, float y) {
-    int x0 = (int)x;
-    int y0 = (int)y;
-    int x1 = x0 + 1 < w ? x0 + 1 : x0;
-    int y1 = y0 + 1 < h ? y0 + 1 : y0;
+void apply_box_filter(unsigned char* input_img, unsigned char* output_img,
+    int width, int height, int box_size) {
+
+    int kernel_size = box_size;
+    int half_kernel = kernel_size / 2;
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int r_sum = 0, g_sum = 0, b_sum = 0;
+            int count = 0;
+            for (int ky = -half_kernel; ky <= half_kernel; ky++) {
+                for (int kx = -half_kernel; kx <= half_kernel; kx++) {
+                    int nx = x + kx, ny = y + ky;
+                    if (nx >= 0 && ny >= 0 && nx < width && ny < height) {
+                        int idx = (ny * width + nx) * 3;
+                        r_sum += input_img[idx];
+                        g_sum += input_img[idx + 1];
+                        b_sum += input_img[idx + 2];
+                        count++;
+                    }
+                }
+            }
+            int idx = (y * width + x) * 3;
+            output_img[idx] = r_sum / count;
+            output_img[idx + 1] = g_sum / count;
+            output_img[idx + 2] = b_sum / count;
+        }
+    }
+}
+
+unsigned char interpolate_linear(unsigned char* image, int width, int height, int channel, float x, float y) {
+
+    int x0 = (int)(x);
+    int y0 = (int)(y);
+    int x1 = x0 + 1 < width ? x0 + 1 : x0;
+    int y1 = y0 + 1 < height ? y0 + 1 : y0;
 
     float dx = x - x0;
     float dy = y - y0;
 
-    // Interpolation for the R channel (we assume the image is RGB)
-    float pixel = 0;
-    pixel += (1 - dx) * (1 - dy) * image[(y0 * w + x0) * 3];  // R value at (x0, y0)
-    pixel += dx * (1 - dy) * image[(y0 * w + x1) * 3];        // R value at (x1, y0)
-    pixel += (1 - dx) * dy * image[(y1 * w + x0) * 3];         // R value at (x0, y1)
-    pixel += dx * dy * image[(y1 * w + x1) * 3];               // R value at (x1, y1)
+    // Exact boundary checks (do not allow out of bounds accesses)
+    if (x1 >= width) x1 = width - 1;
+    if (y1 >= height) y1 = height - 1;
 
-    // Return the pixel value clipped to [0, 255] range
-    if (pixel < 0) pixel = 0;
-    if (pixel > 255) pixel = 255;
+    // Calculate indices for the 2x2 neighborhood
+    int idx00 = (y0 * width + x0) * 3 + channel;
+    int idx10 = (y0 * width + x1) * 3 + channel;
+    int idx01 = (y1 * width + x0) * 3 + channel;
+    int idx11 = (y1 * width + x1) * 3 + channel;
 
-    return (unsigned char)(pixel);
+    // Bilinear interpolation formula
+    float pixel_value = (1 - dx) * (1 - dy) * image[idx00] +
+        dx * (1 - dy) * image[idx10] +
+        (1 - dx) * dy * image[idx01] +
+        dx * dy * image[idx11];
+
+    // Clamp the value to 0-255 range
+    pixel_value = (pixel_value < 0) ? 0 : ((pixel_value > 255) ? 255 : pixel_value);
+
+    // Round to nearest integer (ensures uniform rounding across all cases)
+    return (unsigned char)floor(pixel_value + 0.5f); // Round to nearest, away from zero
 }
 
-// Modified resize_image function using helper functions
+void gaussian_blur(unsigned char* input_img, unsigned char* output_img,
+    int width, int height, int kernel_size) {
+    int radius = kernel_size / 2;
+    double sigma = kernel_size / 6.0;
+    double sum = 0.0;
+    double* kernel = malloc(kernel_size * sizeof(double));
+
+    // Create Gaussian kernel
+    for (int i = -radius; i <= radius; i++) {
+        kernel[i + radius] = exp(-(i * i) / (2 * sigma * sigma));
+        sum += kernel[i + radius];
+    }
+
+    // Normalize the kernel
+    for (int i = 0; i < kernel_size; i++) {
+        kernel[i] /= sum;
+    }
+
+    // Apply the Gaussian blur
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            double r_sum = 0.0, g_sum = 0.0, b_sum = 0.0;
+            for (int ky = -radius; ky <= radius; ky++) {
+                for (int kx = -radius; kx <= radius; kx++) {
+                    int nx = x + kx, ny = y + ky;
+                    if (nx >= 0 && ny >= 0 && nx < width && ny < height) {
+                        int idx = (ny * width + nx) * 3;
+                        r_sum += input_img[idx] * kernel[kx + radius] * kernel[ky + radius];
+                        g_sum += input_img[idx + 1] * kernel[kx + radius] * kernel[ky + radius];
+                        b_sum += input_img[idx + 2] * kernel[kx + radius] * kernel[ky + radius];
+                    }
+                }
+            }
+            int idx = (y * width + x) * 3;
+            output_img[idx] = (unsigned char)(r_sum);
+            output_img[idx + 1] = (unsigned char)(g_sum);
+            output_img[idx + 2] = (unsigned char)(b_sum);
+        }
+    }
+    free(kernel);
+}
+
 void resize_image(unsigned char* input_img, unsigned char* output_img,
     int input_width, int input_height,
     int output_width, int output_height) {
 
-    float x_ratio = (float)(input_width) / output_width;
-    float y_ratio = (float)(input_height) / output_height;
+    unsigned char* temp_img = malloc(input_width * input_height * 3 * sizeof(unsigned char));
+
+    // Apply box filter before downscaling
+    apply_box_filter(input_img, temp_img, input_width, input_height, 3);
+
+    float x_ratio = (float)input_width / output_width;
+    float y_ratio = (float)input_height / output_height;
 
     for (int y = 0; y < output_height; y++) {
         for (int x = 0; x < output_width; x++) {
-            // Calculate the coordinates in the input image
-            float gx = x * x_ratio;
-            float gy = y * y_ratio;
+            // Calculate corresponding coordinates in the input image
+            float gx = (x + 0.5f) * x_ratio - 0.5f;
+            float gy = (y + 0.5f) * y_ratio - 0.5f;
 
-            // Use bilinear interpolation for each color channel (R, G, B)
+            // Clamp to image boundaries
+            if (gx < 0) gx = 0;
+            if (gy < 0) gy = 0;
+            if (gx >= input_width) gx = input_width - 1; // Ensure we don¡¯t overshoot
+            if (gy >= input_height) gy = input_height - 1; // Same for vertical
+
+            // Interpolate each channel (R, G, B)
             for (int c = 0; c < 3; c++) {
-                unsigned char interpolated_value = interpolate(input_img, input_width, input_height, gx, gy);
-
-                // Set the pixel value for the output image
-                output_img[(y * output_width + x) * 3 + c] = interpolated_value;
+                output_img[(y * output_width + x) * 3 + c] = interpolate_linear(input_img, input_width, input_height, c, gx, gy);
             }
         }
     }
+
+    // Apply Gaussian blur after interpolation
+    gaussian_blur(output_img, temp_img, output_width, output_height, 5);
+
+    free(temp_img);
 }
 
 void normalize_image(unsigned char* input_img, float* output_img, int output_width, int output_height) {
@@ -146,9 +238,9 @@ void normalize_image(unsigned char* input_img, float* output_img, int output_wid
     }
 }
 
-
-void preprocess_image(unsigned char* input_img, unsigned char* output_img, int input_width, int input_height, int output_width, int output_height) {
-    unsigned char* resized_img = (unsigned char*)malloc(output_width * output_height * sizeof(unsigned char));
+void preprocess_image(unsigned char* input_img, unsigned char* output_img, 
+    int input_width, int input_height, int output_width, int output_height) {
+    unsigned char* resized_img = (unsigned char*)malloc(output_width * output_height * 3);
     resize_image(input_img, resized_img,input_width, input_height, output_width, output_height);
     normalize_image(resized_img, output_img, output_width, output_height);
     free(resized_img);

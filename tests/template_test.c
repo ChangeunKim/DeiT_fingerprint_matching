@@ -3,7 +3,7 @@
 // Compare the image data with the reference data byte by byte and log mismatches
 void compare_images_unit(unsigned char* img, unsigned char* raw_img, unsigned char* reference_data, long img_data_size) {
     int mismatch_count = 0;  // Count mismatched pixels
-    unsigned char tolerance = 10; // Allow a tolerance for byte-by-byte comparison
+    unsigned char tolerance = 1; // Allow a tolerance for byte-by-byte comparison
 
     long num_pixels = img_data_size / 3;  // Assuming 3 channels (RGB)
 
@@ -34,9 +34,9 @@ void compare_images_unit(unsigned char* img, unsigned char* raw_img, unsigned ch
 
 void compare_images_float(float* img, unsigned char* raw_img, float* reference_data, long img_data_size) {
     int mismatch_count = 0;  // Count mismatched pixels
-    float tolerance = 0.1; // Allow a tolerance for byte-by-byte comparison
+    float tolerance = 0.05; // Allow a tolerance for byte-by-byte comparison
 
-    long num_pixels = img_data_size / 3;  // Assuming 3 channels (RGB)
+    long num_pixels = img_data_size / (sizeof(float) * 3);;  // Assuming 3 channels (RGB)
 
     for (long i = 0; i < num_pixels; i++) {
         for (int c = 0; c < 3; c++) {  // Iterate over color channels (RGB)
@@ -140,6 +140,7 @@ void test_resize_image() {
     // Define the desired output dimensions
     int output_width = 224;
     int output_height = 224;
+
     unsigned char* resized_img = (unsigned char*)malloc(output_width * output_height * 3);
 
     if (resized_img == NULL) {
@@ -184,6 +185,7 @@ void test_resize_image() {
     if (img_data_size != reference_size) {
         fprintf(stderr, "Error: Image data size (%ld) does not match reference size (%ld)\n", img_data_size, reference_size);
         free(img);
+        free(resized_img);
         free(reference_data);
         exit(1);
     }
@@ -194,12 +196,11 @@ void test_resize_image() {
     // Compare the image data with the reference data byte by byte
     compare_images_unit(resized_img, img, reference_data, img_data_size);
 
-    printf("Test passed! Resizing.\n");
-
+    printf("Test passed. Resizing matches the reference.\n");
 
     // Clean up
     free(img);
-
+    free(resized_img);
 }
 
 void test_normalize_image() {
@@ -230,6 +231,84 @@ void test_normalize_image() {
     if (reference_file == NULL) {
         fprintf(stderr, "Error: Failed to open reference file\n");
         free(img);
+        free(normalized_img);
+        exit(1);
+    }
+
+    // Get size of the reference file
+    fseek(reference_file, 0, SEEK_END);
+    long reference_size = ftell(reference_file);
+    fseek(reference_file, 0, SEEK_SET);
+
+    // Allocate buffer for reference data and read it
+    float* reference_data = (float*)malloc(reference_size);
+    if (reference_data == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed\n");
+        fclose(reference_file);
+        free(img);
+        free(normalized_img);
+        exit(1);
+    }
+    fread(reference_data, 1, reference_size, reference_file);
+    fclose(reference_file);
+
+    // Verify that the size matches the expected BMP data size
+    long img_data_size = width * height * 3 * sizeof(float);  // Considering bpp (bits per pixel)
+    
+    if (img_data_size != reference_size) {
+        fprintf(stderr, "Error: Image data size (%ld) does not match reference size (%ld)\n", img_data_size, reference_size);
+        free(img);
+        free(normalized_img);
+        free(reference_data);
+        exit(1);
+    }
+    else {
+        printf("Image size matches the reference size: %ld bytes\n", img_data_size);
+    }
+
+    // Compare the image data with the reference data byte by byte
+    compare_images_float(normalized_img, img, reference_data, img_data_size);
+
+    // Clean up
+    free(img);
+    free(normalized_img);
+    free(reference_data);
+}
+
+void test_preprocess_image() {
+    const char* bmp_filename = "tests/samples/fingerprint_image.bmp";
+    const char* reference_filename = "tests/samples/resized_and_normalized_image_reference.bin";
+    unsigned char* img = NULL;
+    int width, height;
+
+    // Read the BMP file
+    if (read_bmp_image(bmp_filename, &img, &width, &height) != 0) {
+        fprintf(stderr, "Failed to read BMP image.\n");
+        return;
+    }
+
+    printf("Original Image Size: %dx%d\n", width, height);
+
+    // Define the desired output dimensions
+    int output_width = 224;
+    int output_height = 224;
+
+    // Allocate memory for normalized image
+    float* preprocessed_img = (float*)malloc(output_width * output_height * 3 * sizeof(float));
+    if (preprocessed_img == NULL) {
+        fprintf(stderr, "Failed to allocate memory for normalized image.\n");
+        free(img);
+        return;
+    }
+
+    // Normalize the image
+    preprocess_image(img, preprocessed_img, width, height, output_width, output_height);
+
+    // Open the reference binary file
+    FILE* reference_file = fopen(reference_filename, "rb");
+    if (reference_file == NULL) {
+        fprintf(stderr, "Error: Failed to open reference file\n");
+        free(img);
         exit(1);
     }
 
@@ -250,68 +329,12 @@ void test_normalize_image() {
     fclose(reference_file);
 
     // Verify that the size matches the expected BMP data size
-    long img_data_size = width * height * 3 * sizeof(float);  // Considering bpp (bits per pixel)
-    
-    if (img_data_size != reference_size) {
-        fprintf(stderr, "Error: Image data size (%ld) does not match reference size (%ld)\n", img_data_size, reference_size);
-        free(img);
-        free(reference_data);
-        exit(1);
-    }
-    else {
-        printf("Image size matches the reference size: %ld bytes\n", img_data_size);
-    }
-
-    // Compare the image data with the reference data byte by byte
-    compare_images_float(normalized_img, img, reference_data, img_data_size);
-
-    // Clean up
-    free(img);
-    free(normalized_img);
-}
-
-void test_preprocess_image() {
-    const char* bmp_filename = "tests/samples/fingerprint_image.bmp";
-    const char* reference_filename = "tests/samples/resized_and_normalized_image_reference.bin";
-    unsigned char* img = NULL;
-    int width, height;
-
-    // Read the BMP file
-    if (read_bmp_image(bmp_filename, &img, &width, &height) != 0) {
-        fprintf(stderr, "Failed to read BMP image.\n");
-        return;
-    }
-
-    // Open the reference binary file
-    FILE* reference_file = fopen(reference_filename, "rb");
-    if (reference_file == NULL) {
-        fprintf(stderr, "Error: Failed to open reference file\n");
-        free(img);
-        exit(1);
-    }
-
-    // Get size of the reference file
-    fseek(reference_file, 0, SEEK_END);
-    long reference_size = ftell(reference_file);
-    fseek(reference_file, 0, SEEK_SET);
-
-    // Allocate buffer for reference data and read it
-    unsigned char* reference_data = (unsigned char*)malloc(reference_size);
-    if (reference_data == NULL) {
-        fprintf(stderr, "Error: Memory allocation failed\n");
-        fclose(reference_file);
-        free(img);
-        exit(1);
-    }
-    fread(reference_data, 1, reference_size, reference_file);
-    fclose(reference_file);
-
-    // Verify that the size matches the expected BMP data size
     long img_data_size = 224 * 224 * 3 * sizeof(float);  // Considering bpp (bits per pixel)
 
     if (img_data_size != reference_size) {
         fprintf(stderr, "Error: Image data size (%ld) does not match reference size (%ld)\n", img_data_size, reference_size);
         free(img);
+        free(preprocessed_img);
         free(reference_data);
         exit(1);
     }
@@ -320,7 +343,11 @@ void test_preprocess_image() {
     }
 
     // Compare the image data with the reference data byte by byte
-    //compare_images(img, reference_data, img_data_size);
+    compare_images_float(preprocessed_img, img, reference_data, img_data_size);
+
+    free(img);
+    free(preprocessed_img);
+    free(reference_data);
 }
 
 /*

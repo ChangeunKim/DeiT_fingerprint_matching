@@ -26,13 +26,14 @@ void check_file_access(const char* filepath) {
 
 
 int main() {
-    printf("Running test: BMP Reader\n");
-    test_bmp_reader();
-    printf("Completed test: BMP Reader\n\n");
 
     printf("Running test: Cosine Similarity\n");
     test_cosine_similarity();
     printf("Completed test: Cosine Similarity\n\n");
+
+    printf("Running test: BMP Reader\n");
+    test_bmp_reader();
+    printf("Completed test: BMP Reader\n\n");
 
     printf("Running test: Resize Image\n");
     test_resize_image();
