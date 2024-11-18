@@ -3,6 +3,7 @@ models/
 packages/
 x64/
 fingerprint/
+tests/samples/
 
 # Output
 *.onnx
