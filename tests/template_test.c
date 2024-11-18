@@ -1,5 +1,16 @@
 #include "../template.h"
 
+#define ORT_ABORT_ON_ERROR(expr, g_ort)                      \
+  do {                                                       \
+    OrtStatus* onnx_status = (expr);                         \
+    if (onnx_status != NULL) {                               \
+      const char* msg = g_ort->GetErrorMessage(onnx_status); \
+      fprintf(stderr, "Error: %s\n", msg);                   \
+      g_ort->ReleaseStatus(onnx_status);                     \
+      abort();                                               \
+    }                                                        \
+  } while (0)
+
 // Compare the image data with the reference data byte by byte and log mismatches
 void compare_images_unit(unsigned char* img, unsigned char* raw_img, unsigned char* reference_data, long img_data_size) {
     int mismatch_count = 0;  // Count mismatched pixels
@@ -350,52 +361,124 @@ void test_preprocess_image() {
     free(reference_data);
 }
 
-/*
-void test_load_model() {
-    const char* model_path = "C:/Users/owner/source/repos/DeiT_fingerprint_matching/tests/optimized_deit_tiny_siamese.onnx";
-    OrtEnv* env = NULL;
-    OrtSession* session = NULL;
+void test_load_model(const ORTCHAR_T* model_path) {
+    const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
+    if (g_ort == NULL) {
+        fprintf(stderr, "Test failed: Failed to initialize ONNX Runtime API.\n");
+        return -1;
+    }
 
-    printf("Testing model loading: %s\n", model_path);
-
-    // Attempt to load the model
-    int result = load_model(model_path, &env, &session);
-    if (result != 0 || session == NULL) {
-        fprintf(stderr, "\nIn test_load_model() - Test failed: Unable to load model '%s'.\n\n", model_path);
+    if (model_path == NULL) {
+        fprintf(stderr, "Test failed: Invalid file path.\n");
         return;
     }
 
-    printf("Test passed: Model '%s' loaded successfully.\n", model_path);
+    OrtEnv* env = NULL;
+    OrtSession* session = NULL;
 
-    // Verify the session by checking the input and output node counts
-    const OrtApi* api = OrtGetApiBase()->GetApi(ORT_API_VERSION);
-    OrtStatus* status = NULL;
-
-    // Get the number of input nodes
-    size_t num_input_nodes;
-    status = api->SessionGetInputCount(session, &num_input_nodes);
-    if (status != NULL) {
-        fprintf(stderr, "Error getting input count: %s\n", api->GetErrorMessage(status));
-        api->ReleaseStatus(status);
-    }
-    else {
-        printf("Number of inputs: %zu\n", num_input_nodes);
+    // load_model 호출
+    int result = load_model(g_ort, model_path, &env, &session);
+    if (result != 0) {
+        fprintf(stderr, "Test failed: Unable to load model '%s'.\n", model_path);
+        return;
     }
 
-    // Get the number of output nodes
-    size_t num_output_nodes;
-    status = api->SessionGetOutputCount(session, &num_output_nodes);
-    if (status != NULL) {
-        fprintf(stderr, "Error getting output count: %s\n", api->GetErrorMessage(status));
-        api->ReleaseStatus(status);
-    }
-    else {
-        printf("Number of outputs: %zu\n", num_output_nodes);
-    }
+    // 입력 및 출력 노드 수 확인
+    size_t num_input_nodes, num_output_nodes;
+    ORT_ABORT_ON_ERROR(g_ort->SessionGetInputCount(session, &num_input_nodes), g_ort);
+    ORT_ABORT_ON_ERROR(g_ort->SessionGetOutputCount(session, &num_output_nodes), g_ort);
 
-    // Clean up
-    api->ReleaseSession(session);
-    api->ReleaseEnv(env);
-    printf("Test completed successfully.\n");
+    printf("Model loaded successfully.\n");
+    printf("Number of inputs: %zu\n", num_input_nodes);
+    printf("Number of outputs: %zu\n", num_output_nodes);
+
+    // 리소스 해제
+    g_ort->ReleaseSession(session);
+    g_ort->ReleaseEnv(env);
 }
-*/
+
+void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char* image2) {
+    const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
+    if (g_ort == NULL) {
+        fprintf(stderr, "Test failed: Failed to initialize ONNX Runtime API.\n");
+        return;
+    }
+
+    if (model_path == NULL || image1 == NULL || image2 == NULL) {
+        fprintf(stderr, "Test failed: Invalid file paths.\n");
+        return;
+    }
+
+    OrtEnv* env = NULL;
+    OrtSession* session = NULL;
+
+    // 모델 및 세션 로드
+    if (load_model(g_ort, model_path, &env, &session) != 0) {
+        fprintf(stderr, "Test failed: Failed to load model.\n");
+        return;
+    }
+
+    // Load input data (using two BMP images as input)
+    unsigned char* raw_data1 = NULL;
+    unsigned char* raw_data2 = NULL;
+    float* input_data1 = (float*)malloc(3 * 224 * 224 * sizeof(float));
+    float* input_data2 = (float*)malloc(3 * 224 * 224 * sizeof(float));
+    size_t input_height, input_width;
+
+    if (read_bmp_image(image1, &raw_data1, &input_width, &input_height) != 0) {
+        fprintf(stderr, "Failed to load fingerprint image 1.\n");
+        g_ort->ReleaseSession(session);
+        g_ort->ReleaseEnv(env);
+        return;
+    }
+
+    if (read_bmp_image(image2, &raw_data2, &input_width, &input_height) != 0) {
+        fprintf(stderr, "Failed to load fingerprint image 2.\n");
+        free(raw_data1);
+        free(input_data1);
+        g_ort->ReleaseSession(session);
+        g_ort->ReleaseEnv(env);
+        return;
+    }
+
+    // Preprocess image 1
+    preprocess_image(raw_data1, (unsigned char*)input_data1, input_width, input_height, 224, 224);
+
+    // Preprocess image 2
+    preprocess_image(raw_data2, (unsigned char*)input_data2, input_width, input_height, 224, 224);
+
+    // Clean up raw data
+    free(raw_data1);
+    free(raw_data2);
+
+    // Shape of output embedding: [1, 64]
+    float output_data1[64] = { 0 };
+    float output_data2[64] = { 0 };
+
+    int result = run_model(g_ort, session, input_data1, 3 * 224 * 224, input_data2, 3 * 224 * 224,
+        output_data1, 64, output_data2, 64);
+    if (result != 0) {
+        fprintf(stderr, "Test failed: Unable to run model.\n");
+        free(input_data1);
+        free(input_data2);
+        g_ort->ReleaseSession(session);
+        g_ort->ReleaseEnv(env);
+        return;
+    }
+
+    // Model output
+    printf("Model output 1:\n");
+    for (size_t i = 20; i < 30; i++) {
+        printf("Output1[%zu] = %f\n", i, output_data1[i]);
+    }
+
+    printf("Model output 2:\n");
+    for (size_t i = 20; i < 30; i++) {
+        printf("Output2[%zu] = %f\n", i, output_data2[i]);
+    }
+
+    free(input_data1);
+    free(input_data2);
+    g_ort->ReleaseSession(session);
+    g_ort->ReleaseEnv(env);
+}

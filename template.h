@@ -34,13 +34,20 @@ typedef struct {
 
 // Image
 int read_bmp_image(const char* filename, unsigned char** img, int* width, int* height);
+void apply_box_filter(unsigned char* input_img, unsigned char* output_img,
+    int width, int height, int box_size);
+unsigned char interpolate_linear(unsigned char* image, int width, int height, int channel, float x, float y);
+void gaussian_blur(unsigned char* input_img, unsigned char* output_img,
+    int width, int height, int kernel_size);
 void resize_image(unsigned char* input_img, unsigned char* output_img, int input_width, int input_height, int output_width, int output_height);
 void normalize_image(unsigned char* input_img, float* output_img, int output_width, int output_height);
 void preprocess_image(unsigned char* input_img, unsigned char* output_img, int input_width, int input_height, int output_width, int output_height);
 
 // ONNX Model
-int load_model(const OrtApi* g_ort, const char* filename, OrtSession** out_session, OrtEnv** out_env);
-int run_model(OrtSession* session, float* input_template);
+int load_model(const OrtApi* g_ort, const ORTCHAR_T* model_path, OrtEnv** out_env, OrtSession** out_session);
+int run_model(const OrtApi* g_ort, OrtSession* session, float* input_data1, size_t input_size1,
+    float* input_data2, size_t input_size2, float* output_data1, size_t output_size1,
+    float* output_data2, size_t output_size2);
 
 // API function
 int generate_template(const char* image_filename, const char* model_filename, float* input_template);

@@ -1,5 +1,17 @@
 #include "template.h"
 
+#define ORT_ABORT_ON_ERROR(expr, g_ort)                      \
+  do {                                                       \
+    OrtStatus* onnx_status = (expr);                         \
+    if (onnx_status != NULL) {                               \
+      const char* msg = g_ort->GetErrorMessage(onnx_status); \
+      fprintf(stderr, "Error: %s\n", msg);                   \
+      g_ort->ReleaseStatus(onnx_status);                     \
+      return -1;                                             \
+    }                                                        \
+  } while (0)
+
+
 int read_bmp_image(const char* filename, unsigned char** img, int* width, int* height) {
     // Open the BMP file
     FILE* file = fopen(filename, "rb");
@@ -247,64 +259,96 @@ void preprocess_image(unsigned char* input_img, unsigned char* output_img,
 }
 
 // Function to load an ONNX model and create an ONNX Runtime session
-int load_model(const OrtApi* g_ort, const char* filename, OrtSession** out_session, OrtEnv** out_env) {
-    if (g_ort == NULL || filename == NULL || out_session == NULL || out_env == NULL) {
+int load_model(const OrtApi* g_ort, const ORTCHAR_T* model_path, OrtEnv** out_env, OrtSession** out_session) {
+    if (g_ort == NULL || model_path == NULL || out_env == NULL || out_session == NULL) {
         fprintf(stderr, "Invalid input parameters.\n");
         return -1;
     }
 
     OrtEnv* env = NULL;
     OrtSessionOptions* session_options = NULL;
-    OrtStatus* status = NULL;
 
-    // Initialize ONNX Runtime environment
-    status = g_ort->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "ONNXRuntime", &env);
-    if (status != NULL) {
-        fprintf(stderr, "Failed to create ONNX Runtime environment: %s\n", g_ort->GetErrorMessage(status));
-        g_ort->ReleaseStatus(status);
-        return -1;
-    }
+    // ONNX Runtime 환경 생성
+    ORT_ABORT_ON_ERROR(g_ort->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "ONNXRuntime", &env), g_ort);
 
-    // Create session options
-    status = g_ort->CreateSessionOptions(&session_options);
-    if (status != NULL) {
-        fprintf(stderr, "Failed to create session options: %s\n", g_ort->GetErrorMessage(status));
-        g_ort->ReleaseEnv(env);
-        g_ort->ReleaseStatus(status);
-        return -1;
-    }
+    // 세션 옵션 생성
+    ORT_ABORT_ON_ERROR(g_ort->CreateSessionOptions(&session_options), g_ort);
 
-    // Set optimization level to enable all optimizations
+    // 세션 옵션 최적화 설정
     g_ort->SetSessionGraphOptimizationLevel(session_options, ORT_ENABLE_ALL);
 
-    // Load ONNX model and create session
-    status = g_ort->CreateSession(env, filename, session_options, out_session);
-    if (status != NULL) {
-        fprintf(stderr, "Failed to load ONNX model '%s': %s\n", filename, g_ort->GetErrorMessage(status));
-        g_ort->ReleaseSessionOptions(session_options);
-        g_ort->ReleaseEnv(env);
-        g_ort->ReleaseStatus(status);
+    // 모델 로드 및 세션 생성
+    ORT_ABORT_ON_ERROR(g_ort->CreateSession(env, model_path, session_options, out_session), g_ort);
+
+    printf("ONNX model '%s' loaded successfully.\n", model_path);
+
+    // 리소스 해제
+    g_ort->ReleaseSessionOptions(session_options);
+
+    *out_env = env;
+    return 0;  // 성공
+}
+
+
+int run_model(const OrtApi* g_ort, OrtSession* session, float* input_data1, size_t input_size1,
+    float* input_data2, size_t input_size2, float* output_data1, size_t output_size1,
+    float* output_data2, size_t output_size2) {
+    if (g_ort == NULL || session == NULL || input_data1 == NULL || input_data2 == NULL ||
+        output_data1 == NULL || output_data2 == NULL) {
+        fprintf(stderr, "Invalid input parameters.\n");
         return -1;
     }
 
-    printf("ONNX model '%s' loaded successfully.\n", filename);
+    OrtMemoryInfo* memory_info;
+    ORT_ABORT_ON_ERROR(g_ort->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memory_info), g_ort);
 
-    // Clean up session options
-    g_ort->ReleaseSessionOptions(session_options);
+    // 첫 번째 입력 텐서 생성
+    int64_t input_shape1[] = { 1, 3, 224, 224 };
+    OrtValue* input_tensor1 = NULL;
+    ORT_ABORT_ON_ERROR(g_ort->CreateTensorWithDataAsOrtValue(memory_info, input_data1, input_size1 * sizeof(float),
+        input_shape1, 4, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &input_tensor1), g_ort);
 
-    // Return the environment to be used outside
-    *out_env = env;
+    // 두 번째 입력 텐서 생성
+    int64_t input_shape2[] = { 1, 3, 224, 224 };
+    OrtValue* input_tensor2 = NULL;
+    ORT_ABORT_ON_ERROR(g_ort->CreateTensorWithDataAsOrtValue(memory_info, input_data2, input_size2 * sizeof(float),
+        input_shape2, 4, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &input_tensor2), g_ort);
 
-    return 0;
+    // 모델 실행
+    const char* input_names[] = { "input1", "input2" };
+    const char* output_names[] = { "output1", "output2" };
+    OrtValue* output_tensors[2] = { NULL, NULL };
+
+    ORT_ABORT_ON_ERROR(g_ort->Run(session, NULL, input_names,
+        (const OrtValue* const []) {
+        input_tensor1, input_tensor2
+    }, 2,
+        output_names, 2, output_tensors), g_ort);
+
+    // 첫 번째 출력 데이터 가져오기
+    float* output_tensor_data1 = NULL;
+    ORT_ABORT_ON_ERROR(g_ort->GetTensorMutableData(output_tensors[0], (void**)&output_tensor_data1), g_ort);
+    for (size_t i = 0; i < output_size1; i++) {
+        output_data1[i] = output_tensor_data1[i];
+    }
+
+    // 두 번째 출력 데이터 가져오기
+    float* output_tensor_data2 = NULL;
+    ORT_ABORT_ON_ERROR(g_ort->GetTensorMutableData(output_tensors[1], (void**)&output_tensor_data2), g_ort);
+    for (size_t i = 0; i < output_size2; i++) {
+        output_data2[i] = output_tensor_data2[i];
+    }
+
+    // 리소스 해제
+    g_ort->ReleaseMemoryInfo(memory_info);
+    g_ort->ReleaseValue(input_tensor1);
+    g_ort->ReleaseValue(input_tensor2);
+    g_ort->ReleaseValue(output_tensors[0]);
+    g_ort->ReleaseValue(output_tensors[1]);
+
+    return 0;  // 성공
 }
 
-int run_model(OrtSession* session, float* input_template) {
-
-    // 1. create tensor
-    // 2. run session
-
-    return 0;
-}
 
 // API function
 int generate_template(const char* image_filename, const char* model_filename, float* input_template) {
@@ -324,7 +368,7 @@ int generate_template(const char* image_filename, const char* model_filename, fl
 
     // load_model();
     // run_model();
-    
+
     return 0;
 
 }

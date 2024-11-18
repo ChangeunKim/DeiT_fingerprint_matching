@@ -5,25 +5,28 @@
 #include "../template.h"
 
 
+
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
+// UTF-8 문자열을 wchar_t로 변환하는 함수 (Windows 전용)
+#ifdef _WIN32
+wchar_t* convert_to_wchar(const char* utf8_str) {
+    int len = MultiByteToWideChar(CP_UTF8, 0, utf8_str, -1, NULL, 0);
+    wchar_t* wstr = (wchar_t*)malloc(len * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, utf8_str, -1, wstr, len);
+    return wstr;
+}
+#endif
+
+void test_cosine_similarity();
 void test_bmp_reader();
 void test_resize_image();
 void test_normalize_image();
 void test_preprocess_image();
-
-void test_cosine_similarity();
-void check_file_access(const char* filepath) {
-    FILE* file = fopen(filepath, "r");
-    if (file) {
-        printf("File '%s' exists and is accessible.\n", filepath);
-        fclose(file);
-    }
-    else {
-        perror("Error accessing file");
-        printf("File '%s' does not exist or cannot be accessed.\n", filepath);
-    }
-}
-
-
+void test_load_model(const ORTCHAR_T* model_path);
+void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char* image2);
 
 int main() {
 
@@ -39,7 +42,6 @@ int main() {
     test_resize_image();
     printf("Completed test: Resize Image\n\n");
     
-    
     printf("Running test: Normalize Image\n");
     test_normalize_image();
     printf("Completed test: Normalize Image\n\n");
@@ -49,29 +51,17 @@ int main() {
     printf("Completed test: Preprocess Image\n\n");
 
     printf("Running test: Load Model\n");
-    const char* model_path = "tests/optimized_deit_tiny_siamese.onnx";// "C: / Users / owner / source / repos / DeiT_fingerprint_matching / tests / optimized_deit_tiny_siamese.onnx";
-    OrtSession* session = NULL;
-    OrtEnv* env = NULL;
-
-    // Initialize ONNX Runtime
-    const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
-    if (!g_ort) {
-        fprintf(stderr, "Failed to initialize ONNX Runtime.\n");
-        return -1;
-    }
-
-    // Load the model
-    if (load_model(g_ort, model_path, &session, &env) != 0) {
-        return -1;
-    }
-
-    // Prepare dummy input data
-    float input_template[1 * 3 * 224 * 224] = { 0.0f };
+    const wchar_t* model_path = L"C:/Users/user/source/repos/DeiT_fingerprint_matching/models/optimized_deit_tiny_siamese.onnx";  // path in unicode(utf-8)
+    test_load_model(model_path);
+    printf("Completed test: Load Model\n\n");
 
 
-    // Clean up
-    g_ort->ReleaseSession(session);
-    g_ort->ReleaseEnv(env);
+    printf("Running test: Run Model\n");
+    const char* image1 = "tests/samples/fingerprint_image(1).bmp";
+    const char* image2 = "tests/samples/fingerprint_image(10).bmp";
+    test_run_model(model_path, image1, image2);
+    printf("Completed test: Run Model\n\n");
 
     return 0;
 }
+
