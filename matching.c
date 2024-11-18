@@ -27,7 +27,7 @@ float cosine_similarity(const float* vector1, const float* vector2, int vector_l
 float template_distance(const float* template1, const float* template2) {
 
 	float similarity = 0.0;
-	int vector_length = 3;
+	int vector_length = 64;
 
 	similarity = cosine_similarity(template1, template2, vector_length);
 

@@ -250,12 +250,24 @@ void normalize_image(unsigned char* input_img, float* output_img, int output_wid
     }
 }
 
-void preprocess_image(unsigned char* input_img, unsigned char* output_img, 
+void preprocess_image(unsigned char* input_img, float* output_img, 
     int input_width, int input_height, int output_width, int output_height) {
     unsigned char* resized_img = (unsigned char*)malloc(output_width * output_height * 3);
     resize_image(input_img, resized_img,input_width, input_height, output_width, output_height);
     normalize_image(resized_img, output_img, output_width, output_height);
     free(resized_img);
+}
+
+void reshape_image(float* original_image, float* reshaped_image, int width, int height, int channels) {
+    for (int h = 0; h < height; h++) {
+        for (int w = 0; w < width; w++) {
+            for (int c = 0; c < channels; c++) {
+                // The original image is in [height][width][channels] shape
+                // The reshaped image is in [channels][height][width] shape
+                reshaped_image[c * height * width + h * width + w] = original_image[h * width * channels + w * channels + c];
+            }
+        }
+    }
 }
 
 // Function to load an ONNX model and create an ONNX Runtime session
@@ -279,8 +291,6 @@ int load_model(const OrtApi* g_ort, const ORTCHAR_T* model_path, OrtEnv** out_en
 
     // 모델 로드 및 세션 생성
     ORT_ABORT_ON_ERROR(g_ort->CreateSession(env, model_path, session_options, out_session), g_ort);
-
-    printf("ONNX model '%s' loaded successfully.\n", model_path);
 
     // 리소스 해제
     g_ort->ReleaseSessionOptions(session_options);
@@ -351,23 +361,31 @@ int run_model(const OrtApi* g_ort, OrtSession* session, float* input_data1, size
 
 
 // API function
-int generate_template(const char* image_filename, const char* model_filename, float* input_template) {
+int generate_template(const char* image_filename, const char* model_filename, float* output_template) {
+    const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
+    OrtEnv* env = NULL;
+    OrtSession* session = NULL;
 
     unsigned char* img = NULL;
     int width, height;
 
-    // Read the image file
-    if (read_bmp_image(image_filename, &img, &width, &height) != 0) {
-        return -1;  // Error reading image
-    }
+    // Read the BMP file
+    read_bmp_image(image_filename, &img, &width, &height);
 
     // Preprocess image
-    unsigned char output_img[224 * 224];  // Preprocessed image (224x224)
-    preprocess_image(img, output_img, width, height, 224, 224);
+    float* preprocessed_img = (float*)malloc(224 * 224 * 3 * sizeof(float));
+    preprocess_image(img, preprocessed_img, width, height, 224, 224);
     free(img);
 
-    // load_model();
-    // run_model();
+    float* input_data = (float*)malloc(3 * 224 * 224 * sizeof(float));
+
+    // Call the reshape function
+    reshape_image(preprocessed_img, input_data, 224, 224, 3);
+
+    // load_model 호출
+    load_model(g_ort, model_filename, &env, &session);
+    run_model(g_ort, session, input_data, 3 * 224 * 224, input_data, 3 * 224 * 224,
+        output_template, 64, output_template, 64);
 
     return 0;
 

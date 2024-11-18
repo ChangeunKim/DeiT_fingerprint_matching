@@ -376,14 +376,13 @@ void test_load_model(const ORTCHAR_T* model_path) {
     OrtEnv* env = NULL;
     OrtSession* session = NULL;
 
-    // load_model 호출
     int result = load_model(g_ort, model_path, &env, &session);
     if (result != 0) {
         fprintf(stderr, "Test failed: Unable to load model '%s'.\n", model_path);
         return;
     }
 
-    // 입력 및 출력 노드 수 확인
+    // Check input and output dimensions
     size_t num_input_nodes, num_output_nodes;
     ORT_ABORT_ON_ERROR(g_ort->SessionGetInputCount(session, &num_input_nodes), g_ort);
     ORT_ABORT_ON_ERROR(g_ort->SessionGetOutputCount(session, &num_output_nodes), g_ort);
@@ -392,12 +391,12 @@ void test_load_model(const ORTCHAR_T* model_path) {
     printf("Number of inputs: %zu\n", num_input_nodes);
     printf("Number of outputs: %zu\n", num_output_nodes);
 
-    // 리소스 해제
+    // Clean resources
     g_ort->ReleaseSession(session);
     g_ort->ReleaseEnv(env);
 }
 
-void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char* image2) {
+void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char* image2, float* output_data1, float* output_data2) {
     const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
     if (g_ort == NULL) {
         fprintf(stderr, "Test failed: Failed to initialize ONNX Runtime API.\n");
@@ -412,7 +411,7 @@ void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char*
     OrtEnv* env = NULL;
     OrtSession* session = NULL;
 
-    // 모델 및 세션 로드
+    // Load model and session
     if (load_model(g_ort, model_path, &env, &session) != 0) {
         fprintf(stderr, "Test failed: Failed to load model.\n");
         return;
@@ -421,6 +420,8 @@ void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char*
     // Load input data (using two BMP images as input)
     unsigned char* raw_data1 = NULL;
     unsigned char* raw_data2 = NULL;
+    float* preprocessed_data1 = (float*)malloc(224 * 224 * 3 * sizeof(float));
+    float* preprocessed_data2 = (float*)malloc(224 * 224 * 3 * sizeof(float));
     float* input_data1 = (float*)malloc(3 * 224 * 224 * sizeof(float));
     float* input_data2 = (float*)malloc(3 * 224 * 224 * sizeof(float));
     size_t input_height, input_width;
@@ -441,19 +442,21 @@ void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char*
         return;
     }
 
-    // Preprocess image 1
-    preprocess_image(raw_data1, (unsigned char*)input_data1, input_width, input_height, 224, 224);
-
-    // Preprocess image 2
-    preprocess_image(raw_data2, (unsigned char*)input_data2, input_width, input_height, 224, 224);
+    // Preprocess images
+    preprocess_image(raw_data1, preprocessed_data1, input_width, input_height, 224, 224);
+    preprocess_image(raw_data2, preprocessed_data2, input_width, input_height, 224, 224);
 
     // Clean up raw data
     free(raw_data1);
     free(raw_data2);
 
-    // Shape of output embedding: [1, 64]
-    float output_data1[64] = { 0 };
-    float output_data2[64] = { 0 };
+    // Reshape images
+    reshape_image(preprocessed_data1, input_data1, 224, 224, 3);
+    reshape_image(preprocessed_data2, input_data2, 224, 224, 3);
+
+    // Clean up raw data
+    free(preprocessed_data1);
+    free(preprocessed_data2);
 
     int result = run_model(g_ort, session, input_data1, 3 * 224 * 224, input_data2, 3 * 224 * 224,
         output_data1, 64, output_data2, 64);
@@ -481,4 +484,38 @@ void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char*
     free(input_data2);
     g_ort->ReleaseSession(session);
     g_ort->ReleaseEnv(env);
+}
+
+// Utility function to print the embedding template (optional, for debugging)
+void print_template(const float* template_data, int size) {
+    for (int i = 0; i < size; ++i) {
+        printf("%f ", template_data[i]);
+    }
+    printf("\n");
+}
+
+// Testing function for generate_template
+void test_generate_template(const ORTCHAR_T* model_path, const char* image_filename) {
+
+    float* template = (float*)malloc(64 * sizeof(float));
+    if (template == NULL) {
+        fprintf(stderr, "Memory allocation failed for input_template.\n");
+        return;
+    }
+
+    // Call the generate_template function
+    int result = generate_template(image_filename, model_path, template);
+
+    if (result == 0) {
+        printf("Template generated successfully.\n");
+
+        // Print the generated template (optional)
+        print_template(template, 64);
+    }
+    else {
+        printf("Failed to generate template.\n");
+    }
+
+    // Clean up
+    free(template);
 }

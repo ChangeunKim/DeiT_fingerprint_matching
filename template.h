@@ -41,7 +41,8 @@ void gaussian_blur(unsigned char* input_img, unsigned char* output_img,
     int width, int height, int kernel_size);
 void resize_image(unsigned char* input_img, unsigned char* output_img, int input_width, int input_height, int output_width, int output_height);
 void normalize_image(unsigned char* input_img, float* output_img, int output_width, int output_height);
-void preprocess_image(unsigned char* input_img, unsigned char* output_img, int input_width, int input_height, int output_width, int output_height);
+void preprocess_image(unsigned char* input_img, float* output_img, int input_width, int input_height, int output_width, int output_height);
+void reshape_image(float* original_image, float* reshaped_image, int width, int height, int channels);
 
 // ONNX Model
 int load_model(const OrtApi* g_ort, const ORTCHAR_T* model_path, OrtEnv** out_env, OrtSession** out_session);
@@ -50,6 +51,6 @@ int run_model(const OrtApi* g_ort, OrtSession* session, float* input_data1, size
     float* output_data2, size_t output_size2);
 
 // API function
-int generate_template(const char* image_filename, const char* model_filename, float* input_template);
+int generate_template(const char* image_filename, const char* model_filename, float* output_template);
 
 #endif // TEMPLATE_H
