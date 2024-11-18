@@ -2,11 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "test_functions.h"
 #include "../template.h"
 
 
 void test_bmp_reader();
+void test_resize_image();
+void test_normalize_image();
+void test_preprocess_image();
+
 void test_cosine_similarity();
 void check_file_access(const char* filepath) {
     FILE* file = fopen(filepath, "r");
@@ -40,7 +43,9 @@ int main() {
     test_normalize_image();
     printf("Completed test: Normalize Image\n\n");
 
-
+    printf("Running test: Preprocess Image\n");
+    test_preprocess_image();
+    printf("Completed test: Preprocess Image\n\n");
 
     printf("Running test: Load Model\n");
     const char* model_path = "tests/optimized_deit_tiny_siamese.onnx";// "C: / Users / owner / source / repos / DeiT_fingerprint_matching / tests / optimized_deit_tiny_siamese.onnx";

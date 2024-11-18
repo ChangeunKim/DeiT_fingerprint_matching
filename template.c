@@ -78,46 +78,71 @@ int read_bmp_image(const char* filename, unsigned char** img, int* width, int* h
     return 0;
 }
 
-// Function to resize an image using bilinear interpolation
+// Helper function to interpolate pixel values (bilinear interpolation)
+unsigned char interpolate(unsigned char* image, int w, int h, float x, float y) {
+    int x0 = (int)x;
+    int y0 = (int)y;
+    int x1 = x0 + 1 < w ? x0 + 1 : x0;
+    int y1 = y0 + 1 < h ? y0 + 1 : y0;
+
+    float dx = x - x0;
+    float dy = y - y0;
+
+    // Interpolation for the R channel (we assume the image is RGB)
+    float pixel = 0;
+    pixel += (1 - dx) * (1 - dy) * image[(y0 * w + x0) * 3];  // R value at (x0, y0)
+    pixel += dx * (1 - dy) * image[(y0 * w + x1) * 3];        // R value at (x1, y0)
+    pixel += (1 - dx) * dy * image[(y1 * w + x0) * 3];         // R value at (x0, y1)
+    pixel += dx * dy * image[(y1 * w + x1) * 3];               // R value at (x1, y1)
+
+    // Return the pixel value clipped to [0, 255] range
+    if (pixel < 0) pixel = 0;
+    if (pixel > 255) pixel = 255;
+
+    return (unsigned char)(pixel);
+}
+
+// Modified resize_image function using helper functions
 void resize_image(unsigned char* input_img, unsigned char* output_img,
     int input_width, int input_height,
     int output_width, int output_height) {
 
-    float x_ratio = (float)(input_width - 1) / (output_width - 1);
-    float y_ratio = (float)(input_height - 1) / (output_height - 1);
+    float x_ratio = (float)(input_width) / output_width;
+    float y_ratio = (float)(input_height) / output_height;
 
     for (int y = 0; y < output_height; y++) {
         for (int x = 0; x < output_width; x++) {
+            // Calculate the coordinates in the input image
             float gx = x * x_ratio;
             float gy = y * y_ratio;
 
-            int x0 = (int)gx;
-            int y0 = (int)gy;
-            int x1 = (x0 + 1 < input_width) ? x0 + 1 : x0;
-            int y1 = (y0 + 1 < input_height) ? y0 + 1 : y0;
+            // Use bilinear interpolation for each color channel (R, G, B)
+            for (int c = 0; c < 3; c++) {
+                unsigned char interpolated_value = interpolate(input_img, input_width, input_height, gx, gy);
 
-            float wx = gx - x0;
-            float wy = gy - y0;
-
-            // Pixel values at the four corners
-            unsigned char TL = input_img[y0 * input_width + x0];
-            unsigned char TR = input_img[y0 * input_width + x1];
-            unsigned char BL = input_img[y1 * input_width + x0];
-            unsigned char BR = input_img[y1 * input_width + x1];
-
-            // Bilinear interpolation
-            float top = (1 - wx) * TL + wx * TR;
-            float bottom = (1 - wx) * BL + wx * BR;
-            float value = (1 - wy) * top + wy * bottom;
-
-            output_img[y * output_width + x] = (unsigned char)(value + 0.5f);  // Round to nearest
+                // Set the pixel value for the output image
+                output_img[(y * output_width + x) * 3 + c] = interpolated_value;
+            }
         }
     }
 }
 
 void normalize_image(unsigned char* input_img, float* output_img, int output_width, int output_height) {
-    for (int i = 0; i < output_width * output_height; i++) {
-        output_img[i] = input_img[i] / 255.0f;  // Normalize to [0, 1]
+    // Mean and std for each channel (R, G, B)
+    const float mean[3] = { 0.485f, 0.456f, 0.406f };
+    const float std[3] = { 0.229f, 0.224f, 0.225f };
+
+    int total_pixels = output_width * output_height;
+
+    for (int i = 0; i < total_pixels; i++) {
+        for (int c = 0; c < 3; c++) {  // Loop through channels
+            int index = i * 3 + c;  // Calculate the index for the current channel
+            // Normalize pixel value to [0, 1]
+            float normalized_value = input_img[index] / 255.0f;
+            // Apply mean and standard deviation normalization
+            normalized_value = (normalized_value - mean[c]) / std[c];
+            output_img[index] = normalized_value;
+        }
     }
 }
 
