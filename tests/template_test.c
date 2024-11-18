@@ -1,16 +1,5 @@
 #include "../template.h"
 
-#define ORT_ABORT_ON_ERROR(expr, g_ort)                      \
-  do {                                                       \
-    OrtStatus* onnx_status = (expr);                         \
-    if (onnx_status != NULL) {                               \
-      const char* msg = g_ort->GetErrorMessage(onnx_status); \
-      fprintf(stderr, "Error: %s\n", msg);                   \
-      g_ort->ReleaseStatus(onnx_status);                     \
-      abort();                                               \
-    }                                                        \
-  } while (0)
-
 // Compare the image data with the reference data byte by byte and log mismatches
 void compare_images_unit(unsigned char* img, unsigned char* raw_img, unsigned char* reference_data, long img_data_size) {
     int mismatch_count = 0;  // Count mismatched pixels
@@ -392,8 +381,7 @@ void test_load_model(const ORTCHAR_T* model_path) {
     printf("Number of outputs: %zu\n", num_output_nodes);
 
     // Clean resources
-    g_ort->ReleaseSession(session);
-    g_ort->ReleaseEnv(env);
+    clean_model(g_ort, env, session);
 }
 
 void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char* image2, float* output_data1, float* output_data2) {
@@ -428,8 +416,7 @@ void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char*
 
     if (read_bmp_image(image1, &raw_data1, &input_width, &input_height) != 0) {
         fprintf(stderr, "Failed to load fingerprint image 1.\n");
-        g_ort->ReleaseSession(session);
-        g_ort->ReleaseEnv(env);
+        clean_model(g_ort, env, session);
         return;
     }
 
@@ -437,8 +424,7 @@ void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char*
         fprintf(stderr, "Failed to load fingerprint image 2.\n");
         free(raw_data1);
         free(input_data1);
-        g_ort->ReleaseSession(session);
-        g_ort->ReleaseEnv(env);
+        clean_model(g_ort, env, session);
         return;
     }
 
@@ -464,8 +450,7 @@ void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char*
         fprintf(stderr, "Test failed: Unable to run model.\n");
         free(input_data1);
         free(input_data2);
-        g_ort->ReleaseSession(session);
-        g_ort->ReleaseEnv(env);
+        clean_model(g_ort, env, session);
         return;
     }
 
@@ -482,11 +467,10 @@ void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char*
 
     free(input_data1);
     free(input_data2);
-    g_ort->ReleaseSession(session);
-    g_ort->ReleaseEnv(env);
+    clean_model(g_ort, env, session);
 }
 
-// Utility function to print the embedding template (optional, for debugging)
+// Utility function to print the embedding template
 void print_template(const float* template_data, int size) {
     for (int i = 0; i < size; ++i) {
         printf("%f ", template_data[i]);
@@ -497,6 +481,26 @@ void print_template(const float* template_data, int size) {
 // Testing function for generate_template
 void test_generate_template(const ORTCHAR_T* model_path, const char* image_filename) {
 
+    const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
+    if (g_ort == NULL) {
+        fprintf(stderr, "Test failed: Failed to initialize ONNX Runtime API.\n");
+        return;
+    }
+
+    if (model_path == NULL) {
+        fprintf(stderr, "Test failed: Invalid file paths.\n");
+        return;
+    }
+
+    OrtEnv* env = NULL;
+    OrtSession* session = NULL;
+
+    // Load model and session
+    if (load_model(g_ort, model_path, &env, &session) != 0) {
+        fprintf(stderr, "Test failed: Failed to load model.\n");
+        return;
+    }
+
     float* template = (float*)malloc(64 * sizeof(float));
     if (template == NULL) {
         fprintf(stderr, "Memory allocation failed for input_template.\n");
@@ -504,9 +508,7 @@ void test_generate_template(const ORTCHAR_T* model_path, const char* image_filen
     }
 
     // Call the generate_template function
-    int result = generate_template(image_filename, model_path, template);
-
-    if (result == 0) {
+    if (!generate_template(image_filename, g_ort, env, session, template)) {
         printf("Template generated successfully.\n");
 
         // Print the generated template (optional)
@@ -518,4 +520,5 @@ void test_generate_template(const ORTCHAR_T* model_path, const char* image_filen
 
     // Clean up
     free(template);
+    clean_model(g_ort, env, session);
 }

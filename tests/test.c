@@ -2,15 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "../template.h"
-
-
+#include <onnxruntime_c_api.h>
 
 #ifdef _WIN32
 #include <Windows.h>
 #endif
 
-// UTF-8 문자열을 wchar_t로 변환하는 함수 (Windows 전용)
+// UTF-8 to wchar_t
 #ifdef _WIN32
 wchar_t* convert_to_wchar(const char* utf8_str) {
     int len = MultiByteToWideChar(CP_UTF8, 0, utf8_str, -1, NULL, 0);
@@ -31,7 +29,8 @@ void test_verification(const float* embed1, const float* embed2);
 void test_generate_template(const ORTCHAR_T* model_path, const char* image_filename);
 void test_identification(const ORTCHAR_T* model_path);
 
-int main() {
+// wrapper function for user function testers
+void test_helper_functions(const ORTCHAR_T* model_path) {
 
     printf("Running test: Cosine Similarity\n");
     test_cosine_similarity();
@@ -44,7 +43,7 @@ int main() {
     printf("Running test: Resize Image\n");
     test_resize_image();
     printf("Completed test: Resize Image\n\n");
-    
+
     printf("Running test: Normalize Image\n");
     test_normalize_image();
     printf("Completed test: Normalize Image\n\n");
@@ -53,8 +52,11 @@ int main() {
     test_preprocess_image();
     printf("Completed test: Preprocess Image\n\n");
 
+    return 0;
+}
+
+void test_api_functions(const ORTCHAR_T* model_path) {
     printf("Running test: Load Model\n");
-    const wchar_t* model_path = L"C:/Users/user/source/repos/DeiT_fingerprint_matching/models/optimized_deit_tiny_siamese.onnx";  // path in unicode(utf-8)
     test_load_model(model_path);
     printf("Completed test: Load Model\n\n");
 
@@ -75,7 +77,20 @@ int main() {
     printf("Running test: Fingerprint Identification\n");
     test_identification(model_path);
     printf("Completed test: Fingerprint Identification\n\n");
+}
+
+#ifdef _DEBUG 
+int main() {
+
+    // Set model file path
+    const wchar_t* model_path = L"models/optimized_deit_tiny_siamese.onnx";  // path in unicode(utf-8)
+
+    printf("Testing helper functions... \n\n");
+    test_helper_functions(model_path);
+
+    printf("Testing API functions... \n\n");
+    test_api_functions(model_path);
 
     return 0;
 }
-
+#endif

@@ -1,17 +1,5 @@
 #include "template.h"
 
-#define ORT_ABORT_ON_ERROR(expr, g_ort)                      \
-  do {                                                       \
-    OrtStatus* onnx_status = (expr);                         \
-    if (onnx_status != NULL) {                               \
-      const char* msg = g_ort->GetErrorMessage(onnx_status); \
-      fprintf(stderr, "Error: %s\n", msg);                   \
-      g_ort->ReleaseStatus(onnx_status);                     \
-      return -1;                                             \
-    }                                                        \
-  } while (0)
-
-
 int read_bmp_image(const char* filename, unsigned char** img, int* width, int* height) {
     // Open the BMP file
     FILE* file = fopen(filename, "rb");
@@ -361,10 +349,7 @@ int run_model(const OrtApi* g_ort, OrtSession* session, float* input_data1, size
 
 
 // API function
-int generate_template(const char* image_filename, const char* model_filename, float* output_template) {
-    const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
-    OrtEnv* env = NULL;
-    OrtSession* session = NULL;
+int generate_template(const char* image_filename, const OrtApi* g_ort, OrtEnv* env, OrtSession* session, float* output_template) {
 
     unsigned char* img = NULL;
     int width, height;
@@ -382,11 +367,15 @@ int generate_template(const char* image_filename, const char* model_filename, fl
     // Call the reshape function
     reshape_image(preprocessed_img, input_data, 224, 224, 3);
 
-    // load_model È£Ãâ
-    load_model(g_ort, model_filename, &env, &session);
-    run_model(g_ort, session, input_data, 3 * 224 * 224, input_data, 3 * 224 * 224,
+    // Run ViT
+    return run_model(g_ort, session, input_data, 3 * 224 * 224, input_data, 3 * 224 * 224,
         output_template, 64, output_template, 64);
+}
 
-    return 0;
+void clean_model(const OrtApi* g_ort, OrtEnv* env, OrtSession* session) {
+    // Release session (unload model)
+    g_ort->ReleaseSession(session);
 
+    // Release environment
+    g_ort->ReleaseEnv(env);
 }

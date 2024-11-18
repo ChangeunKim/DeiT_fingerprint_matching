@@ -27,9 +27,10 @@ void print_scores(float* scores, int size) {
 
 // Testing function for fingerprint_identification
 void test_identification(const ORTCHAR_T* model_path) {
+
+    // Image filenames for the fingerprint database
     int db_size = 30;
 
-    // Image filenames for the fingerprint database (replace with actual filenames)
     const char* image_filenames[30] = {
         "tests/samples/fingerprint_image.bmp",
         "tests/samples/fingerprint_image(1).bmp",
@@ -77,9 +78,19 @@ void test_identification(const ORTCHAR_T* model_path) {
         }
     }
 
+    // Load model and session
+    const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
+    OrtEnv* env = NULL;
+    OrtSession* session = NULL;
+
+    if (load_model(g_ort, model_path, &env, &session) != 0) {
+        fprintf(stderr, "Test failed: Failed to load model.\n");
+        return;
+    }
+
     // Generate templates for each image in the database
     for (int i = 0; i < db_size; ++i) {
-        if (generate_template(image_filenames[i], model_path, template_db[i]) != 0) {
+        if (generate_template(image_filenames[i], g_ort, env, session, template_db[i]) != 0) {
             fprintf(stderr, "Failed to generate template for image: %s\n", image_filenames[i]);
             return;
         }
@@ -121,4 +132,5 @@ void test_identification(const ORTCHAR_T* model_path) {
     }
     free(template_db);
     free(score);
+    clean_model(g_ort, env, session);
 }
