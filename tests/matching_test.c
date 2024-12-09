@@ -113,16 +113,18 @@ void test_identification(const ORTCHAR_T* model_path) {
             return;
         }
 
-        // Print the scores for the identification test
-        //print_scores(score, db_size);
-
         // Optionally, print the results to check if the query matches the correct template (self-matching should have the lowest score)
+        float min = 2.0;
+        int argmin = 0;
         printf("Query template %d vs. all templates:\n", i + 1);
-        for (int j = 0; j < db_size; ++j) {
-            if (i == j) {
-                printf("Template %d matched itself with score: %f (expected to be the lowest)\n", i + 1, score[j]);
+        for (int j = 0; j < db_size; j++) {
+            if (i == j) continue;
+            if (score[j] < min) {
+                min = score[j]; // Update min if a smaller value is found
+                argmin = j;
             }
         }
+        printf("Minimum score %f at index %d,\n", min, argmin + 1);
         printf("\n");
     }
 

@@ -1,3 +1,9 @@
+# Image files
+*.bmp
+*.jpg
+*.jpeg
+*.png
+
 # C specific log files
 models/
 packages/

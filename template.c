@@ -28,8 +28,8 @@ int read_bmp_image(const char* filename, unsigned char** img, int* width, int* h
     *height = abs(*height);
 
     // Check for valid bit depths (support 24-bit and 8-bit grayscale)
-    if (bpp != 24 && bpp != 8) {
-        fprintf(stderr, "Error: Unsupported BMP format (only 24-bit or 8-bit grayscale supported)\n");
+    if (bpp != 8) {
+        fprintf(stderr, "Error: Unsupported BMP format (8-bit grayscale supported)\n");
         fclose(file);
         return -1;
     }
@@ -50,30 +50,27 @@ int read_bmp_image(const char* filename, unsigned char** img, int* width, int* h
     fseek(file, *(int*)&header[10], SEEK_SET);  // Go to the pixel data offset
     fread(*img, 1, img_data_size, file);
     fclose(file);
-
-    // If the image is grayscale (8-bit), convert it to RGB
-    if (bpp == 8) {
-        unsigned char* temp_img = (unsigned char*)malloc(*width * *height * 3);  // RGB buffer
-        if (temp_img == NULL) {
-            fprintf(stderr, "Error: Memory allocation failed for grayscale to RGB conversion\n");
-            free(*img);
-            return -1;
-        }
-
-        // Convert grayscale to RGB
-        for (int i = 0, j = 0; i < *height; i++) {
-            for (int k = 0; k < *width; k++) {
-                unsigned char gray = (*img)[i * row_size + k];
-                temp_img[j++] = gray;  // Red
-                temp_img[j++] = gray;  // Green
-                temp_img[j++] = gray;  // Blue
-            }
-        }
-
-        // Free the old image data and point to the new RGB data
+    
+    unsigned char* temp_img = (unsigned char*)malloc(*width * *height * 3);  // RGB buffer
+    if (temp_img == NULL) {
+        fprintf(stderr, "Error: Memory allocation failed for grayscale to RGB conversion\n");
         free(*img);
-        *img = temp_img;
+        return -1;
     }
+
+    // Convert grayscale to RGB
+    for (int i = 0, j = 0; i < *height; i++) {
+        for (int k = 0; k < *width; k++) {
+            unsigned char gray = (*img)[i * row_size + k];
+            temp_img[j++] = gray;  // Red
+            temp_img[j++] = gray;  // Green
+            temp_img[j++] = gray;  // Blue
+        }
+    }
+
+    // Free the old image data and point to the new RGB data
+    free(*img);
+    *img = temp_img;
 
     return 0;
 }
@@ -203,7 +200,7 @@ void resize_image(unsigned char* input_img, unsigned char* output_img,
             // Clamp to image boundaries
             if (gx < 0) gx = 0;
             if (gy < 0) gy = 0;
-            if (gx >= input_width) gx = input_width - 1; // Ensure we don¡¯t overshoot
+            if (gx >= input_width) gx = input_width - 1; // Ensure we donï¿½ï¿½t overshoot
             if (gy >= input_height) gy = input_height - 1; // Same for vertical
 
             // Interpolate each channel (R, G, B)
@@ -268,23 +265,23 @@ int load_model(const OrtApi* g_ort, const ORTCHAR_T* model_path, OrtEnv** out_en
     OrtEnv* env = NULL;
     OrtSessionOptions* session_options = NULL;
 
-    // ONNX Runtime È¯°æ »ý¼º
+    // ONNX Runtime È¯ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     ORT_ABORT_ON_ERROR(g_ort->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "ONNXRuntime", &env), g_ort);
 
-    // ¼¼¼Ç ¿É¼Ç »ý¼º
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½É¼ï¿½ ï¿½ï¿½ï¿½ï¿½
     ORT_ABORT_ON_ERROR(g_ort->CreateSessionOptions(&session_options), g_ort);
 
-    // ¼¼¼Ç ¿É¼Ç ÃÖÀûÈ­ ¼³Á¤
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½É¼ï¿½ ï¿½ï¿½ï¿½ï¿½È­ ï¿½ï¿½ï¿½ï¿½
     g_ort->SetSessionGraphOptimizationLevel(session_options, ORT_ENABLE_ALL);
 
-    // ¸ðµ¨ ·Îµå ¹× ¼¼¼Ç »ý¼º
+    // ï¿½ï¿½ ï¿½Îµï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     ORT_ABORT_ON_ERROR(g_ort->CreateSession(env, model_path, session_options, out_session), g_ort);
 
-    // ¸®¼Ò½º ÇØÁ¦
+    // ï¿½ï¿½ï¿½Ò½ï¿½ ï¿½ï¿½ï¿½ï¿½
     g_ort->ReleaseSessionOptions(session_options);
 
     *out_env = env;
-    return 0;  // ¼º°ø
+    return 0;  // ï¿½ï¿½ï¿½ï¿½
 }
 
 
@@ -300,19 +297,19 @@ int run_model(const OrtApi* g_ort, OrtSession* session, float* input_data1, size
     OrtMemoryInfo* memory_info;
     ORT_ABORT_ON_ERROR(g_ort->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memory_info), g_ort);
 
-    // Ã¹ ¹øÂ° ÀÔ·Â ÅÙ¼­ »ý¼º
+    // Ã¹ ï¿½ï¿½Â° ï¿½Ô·ï¿½ ï¿½Ù¼ï¿½ ï¿½ï¿½ï¿½ï¿½
     int64_t input_shape1[] = { 1, 3, 224, 224 };
     OrtValue* input_tensor1 = NULL;
     ORT_ABORT_ON_ERROR(g_ort->CreateTensorWithDataAsOrtValue(memory_info, input_data1, input_size1 * sizeof(float),
         input_shape1, 4, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &input_tensor1), g_ort);
 
-    // µÎ ¹øÂ° ÀÔ·Â ÅÙ¼­ »ý¼º
+    // ï¿½ï¿½ ï¿½ï¿½Â° ï¿½Ô·ï¿½ ï¿½Ù¼ï¿½ ï¿½ï¿½ï¿½ï¿½
     int64_t input_shape2[] = { 1, 3, 224, 224 };
     OrtValue* input_tensor2 = NULL;
     ORT_ABORT_ON_ERROR(g_ort->CreateTensorWithDataAsOrtValue(memory_info, input_data2, input_size2 * sizeof(float),
         input_shape2, 4, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &input_tensor2), g_ort);
 
-    // ¸ðµ¨ ½ÇÇà
+    // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     const char* input_names[] = { "input1", "input2" };
     const char* output_names[] = { "output1", "output2" };
     OrtValue* output_tensors[2] = { NULL, NULL };
@@ -323,28 +320,28 @@ int run_model(const OrtApi* g_ort, OrtSession* session, float* input_data1, size
     }, 2,
         output_names, 2, output_tensors), g_ort);
 
-    // Ã¹ ¹øÂ° Ãâ·Â µ¥ÀÌÅÍ °¡Á®¿À±â
+    // Ã¹ ï¿½ï¿½Â° ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     float* output_tensor_data1 = NULL;
     ORT_ABORT_ON_ERROR(g_ort->GetTensorMutableData(output_tensors[0], (void**)&output_tensor_data1), g_ort);
     for (size_t i = 0; i < output_size1; i++) {
         output_data1[i] = output_tensor_data1[i];
     }
 
-    // µÎ ¹øÂ° Ãâ·Â µ¥ÀÌÅÍ °¡Á®¿À±â
+    // ï¿½ï¿½ ï¿½ï¿½Â° ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     float* output_tensor_data2 = NULL;
     ORT_ABORT_ON_ERROR(g_ort->GetTensorMutableData(output_tensors[1], (void**)&output_tensor_data2), g_ort);
     for (size_t i = 0; i < output_size2; i++) {
         output_data2[i] = output_tensor_data2[i];
     }
 
-    // ¸®¼Ò½º ÇØÁ¦
+    // ï¿½ï¿½ï¿½Ò½ï¿½ ï¿½ï¿½ï¿½ï¿½
     g_ort->ReleaseMemoryInfo(memory_info);
     g_ort->ReleaseValue(input_tensor1);
     g_ort->ReleaseValue(input_tensor2);
     g_ort->ReleaseValue(output_tensors[0]);
     g_ort->ReleaseValue(output_tensors[1]);
 
-    return 0;  // ¼º°ø
+    return 0;  // ï¿½ï¿½ï¿½ï¿½
 }
 
 

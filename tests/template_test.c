@@ -384,6 +384,14 @@ void test_load_model(const ORTCHAR_T* model_path) {
     clean_model(g_ort, env, session);
 }
 
+// Utility function to print the embedding template
+void print_template(const float* template_data, int size) {
+    for (int i = 0; i < size; ++i) {
+        printf("%f, ", template_data[i]);
+    }
+    printf("\n");
+}
+
 void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char* image2, float* output_data1, float* output_data2) {
     const OrtApi* g_ort = OrtGetApiBase()->GetApi(ORT_API_VERSION);
     if (g_ort == NULL) {
@@ -456,26 +464,13 @@ void test_run_model(const ORTCHAR_T* model_path, const char* image1, const char*
 
     // Model output
     printf("Model output 1:\n");
-    for (size_t i = 20; i < 30; i++) {
-        printf("Output1[%zu] = %f\n", i, output_data1[i]);
-    }
-
+    print_template(output_data1, 64);
     printf("Model output 2:\n");
-    for (size_t i = 20; i < 30; i++) {
-        printf("Output2[%zu] = %f\n", i, output_data2[i]);
-    }
+    print_template(output_data2, 64);
 
     free(input_data1);
     free(input_data2);
     clean_model(g_ort, env, session);
-}
-
-// Utility function to print the embedding template
-void print_template(const float* template_data, int size) {
-    for (int i = 0; i < size; ++i) {
-        printf("%f ", template_data[i]);
-    }
-    printf("\n");
 }
 
 // Testing function for generate_template

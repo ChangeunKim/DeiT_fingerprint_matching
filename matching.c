@@ -6,12 +6,13 @@ float cosine_similarity(const float* vector1, const float* vector2, int vector_l
 	float dot_product = 0.0;
 	float magnitude1 = 0.0;
 	float magnitude2 = 0.0;
+	float eps = 1e-8;
 
 	// Calculate dot product and magnitudes
 	for (int i = 0; i < vector_length; ++i) {
 		dot_product += vector1[i] * vector2[i];
-		magnitude1 += vector1[i] * vector1[i];
-		magnitude2 += vector2[i] * vector2[i];
+		magnitude1 += vector1[i] * vector1[i] + eps;
+		magnitude2 += vector2[i] * vector2[i] + eps;
 	}
 	magnitude1 = sqrtf(magnitude1);
 	magnitude2 = sqrtf(magnitude2);
